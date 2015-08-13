@@ -43,20 +43,24 @@ def PrintStateMachine(sm):
     txt += ['  size="11,8";']
     txt += ['  ratio="expand";']
     txt += ['  rankdir=LR;']
-    txt += ['  node [shape=record];']
+    txt += ['  node [shape=plaintext];']
+    txt += ['  labelloc="t";']
+    txt += ['  label=<<B>%s</B>>' % sm['Filename']]
     txt += ['']
     if len(sm['Events']) > 0:
         print "Events:", ", ".join([FormatEvent(e) for e in sorted(sm['Events'])])
     if len(sm['States']) > 0:
         print "States:", ", ".join(sorted(sm['States']))
-        for state in sorted(sm['States']):
+        for state in sm['States']:
             print "    %s" % state
-            if state in sm['Blocks'] and len(sm['Blocks'][state]) > 0:
-                label = ['<f0> %s' % state, '{']
+            if state in sm['Blocks']:
+                label = ['<TABLE><TH><TD PORT="f0"><B>']
+                label += [' %s' % state]
+                label += ['</B></TD></TH>']
                 for idx, event in enumerate(sm['Blocks'][state]):
-                    label += ['<f%d> %s' % (idx + 1, FormatEvent(event[0]))]
-                label += ['}']
-                txt += ['  %s[shape=record, label="%s"];' % (state, '|'.join(label))]
+                    label += ['<TR><TD PORT="f%d">%s</TD></TR>' % (idx + 1, FormatEvent(event[0]))]
+                label += ['</TABLE>']
+                txt += ['  %s[label=<%s>];' % (state, ' '.join(label))]
                 for idx, event in enumerate(sm['Blocks'][state]):
                     print "        %s ->"  % FormatEvent(event[0]),
                     if len(event[1]) > 1:
@@ -268,6 +272,7 @@ def p_fsm(p):
     p[0] = [{'Statemachine' : {p[2] : p[3]}}]
     if Verbose:
         print "Statemachine:", p[0]
+    Statemachine['Name'] = p[2]
 
 def p_fsm_block(p):
     'fsm_block : LBRACE fsm_statement_list RBRACE'
@@ -457,6 +462,7 @@ def load_file(source_file, depth_list):
 def process_source(source_file):
     global Statemachine
     Statemachine = {}
+    Statemachine['Filename'] = source_file
     Statemachine['States'] = []
     Statemachine['Events'] = []
     Statemachine['Blocks'] = {}
@@ -478,7 +484,7 @@ def main():
 
     graphviz = ['dot', 'circo', 'neato', 'fdp', 'sfdp', 'twopi', 'osage', 'patchwork']
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--dot", default="sfdp", choices=graphviz, help="graphviz layout tool to use")
+    parser.add_argument("-d", "--dot", default="dot", choices=graphviz, help="graphviz layout tool to use")
     parser.add_argument("-l", "--lexdebug", help="lex debug output",
                         action="store_true")
     parser.add_argument("-y", "--yaccdebug", help="yacc debug output",
