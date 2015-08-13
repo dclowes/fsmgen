@@ -58,9 +58,15 @@ def PrintStateMachine(sm):
                 label += [' %s' % state]
                 label += ['</B></TD></TH>']
                 for idx, event in enumerate(sm['Blocks'][state]):
-                    label += ['<TR><TD PORT="f%d">%s</TD></TR>' % (idx + 1, FormatEvent(event[0]))]
+                    if len(event[1]) > 0:
+                        label += ['<TR><TD><TABLE>']
+                        label += ['<TH><TD PORT="f%d"><B>%s</B></TD></TH>' % (idx + 1, FormatEvent(event[0]))]
+                        label += ['<TR><TD>%s</TD></TR>' % '</TD></TR><TR><TD>'.join(event[1])]
+                        label += ['</TABLE></TD></TR>']
+                    else:
+                        label += ['<TR><TD PORT="f%d">%s</TD></TR>' % (idx + 1, FormatEvent(event[0]))]
                 label += ['</TABLE>']
-                txt += ['  %s[label=<%s>];' % (state, ' '.join(label))]
+                txt += ['  %s[label=<%s>];' % (state, ''.join(label))]
                 for idx, event in enumerate(sm['Blocks'][state]):
                     print "        %s ->"  % FormatEvent(event[0]),
                     print "%s" % ", ".join(event[1]),
