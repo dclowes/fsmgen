@@ -63,15 +63,9 @@ def PrintStateMachine(sm):
                 txt += ['  %s[label=<%s>];' % (state, ' '.join(label))]
                 for idx, event in enumerate(sm['Blocks'][state]):
                     print "        %s ->"  % FormatEvent(event[0]),
-                    if len(event[1]) > 1:
-                        print "%s" % ", ".join(event[1]),
-                    else:
-                        print "%s" % event[1][0],
+                    print "%s" % ", ".join(event[1]),
                     if len(event) > 2:
-                        if len(event[2]) > 1:
-                            print "=> %s" % ", ".join(event[2]),
-                        else:
-                            print "=> %s" % event[2][0],
+                        print "=> %s" % ", ".join(event[2]),
                         for e in event[2]:
                             txt += ['    %s:f%d -> %s:f0;' % (state, idx + 1, e)]
                     print
