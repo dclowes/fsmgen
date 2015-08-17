@@ -33,6 +33,96 @@ def FormatEvent(event):
         txt = "%s" % (event[0])
     return txt
 
+def PrintStateTable1(sm):
+    txt = ['<TABLE BORDER=1>\n']
+    txt += ['<TR>']
+    txt += ['<TH><TABLE WIDTH=100%%><TR><TD ALIGN="right">%s</TD></TR><TR><TD ALIGN="left">%s</TD></TR></TABLE></TH>' % ('Next(&gt;)', 'Current(v)')]
+    for s_next in sorted(sm['States']):
+        txt += ['<TH>%s</TH>' % s_next]
+    txt += ['</TR>\n']
+    for s_curr in sorted(sm['States']):
+        txt += ['<TR><TD VALIGN="top"><B>%s</B></TD>' % s_curr]
+        for s_next in sorted(sm['States']):
+            txt += ['<TD VALIGN="top"><TABLE>']
+            for block in sm['Blocks'][s_curr]:
+                #print "Block:", block
+                if (s_curr == s_next and len(block) < 3) or (len(block) > 2 and s_next in block[2]):
+                    event = FormatEvent(block[0])
+                    action = ',<BR/>'.join(block[1])
+                    txt += ['<TR><TD VALIGN="top"><B>%s</B></TD><TD VALIGN="top">%s</TD></TR>' % (event, action)]
+            txt += ['</TABLE></TD>']
+        txt += ['</TR>\n']
+    txt += ['</TABLE>\n']
+    return txt
+
+def PrintStateTable2(sm):
+    txt = ['<TABLE BORDER=1>\n']
+    txt += ['<TR>']
+    txt += ['<TH><TABLE WIDTH=100%%><TR><TD VALIGN="right">%s</TD></TR><TR><TD VALIGN="left">%s</TD></TR></TABLE></TH>' % ('State(&gt;)', 'Event(v)')]
+    the_states = sorted(sm['States'])
+    print '**The States:', the_states
+    the_events = []
+    for b in sm['Blocks']:
+        for t in sm['Blocks'][b]:
+            if t[0] not in the_events:
+                the_events.append(t[0])
+    the_events = sorted(the_events)
+    print '**The Events:', [FormatEvent(e) for e in the_events]
+    for s in the_states:
+        txt += ['<TH>%s</TH>' % s]
+    txt += ['</TR>\n']
+    for e in the_events:
+        txt += ['<TR><TD VALIGN="top"><B>%s</B></TD>' % FormatEvent(e)]
+        for s in the_states:
+            txt += ['<TD VALIGN="top"><TABLE>']
+            for block in sm['Blocks'][s]:
+                #print "Block:", block
+                if e == block[0]:
+                    action = ',<BR/>'.join(block[1])
+                    next_state = ''
+                    if len(block) > 2:
+                        next_state = '<B>' + ',<BR>'.join(block[2]) + '</B>'
+                    txt += ['<TR><TD VALIGN="top">%s</TD><TD VALIGN="top">%s</TD></TR>' % (action, next_state)]
+            txt += ['</TABLE></TD>']
+        txt += ['</TR>\n']
+    txt += ['</TABLE>\n']
+    return txt
+
+def PrintStateTable3(sm):
+    txt = ['<TABLE BORDER=1>\n']
+    txt += ['<TR>']
+    for t in ['State', 'Event', 'Actions', 'Next']:
+        txt += ['<TH>%s</TH>' % t]
+    txt += ['</TR>\n']
+    the_states = sorted(sm['States'])
+    print '**The States:', the_states
+    the_events = []
+    for b in sm['Blocks']:
+        for t in sm['Blocks'][b]:
+            if t[0] not in the_events:
+                the_events.append(t[0])
+    the_events = sorted(the_events)
+    print '**The Events:', [FormatEvent(e) for e in the_events]
+    for s in the_states:
+        for e in the_events:
+            for block in sm['Blocks'][s]:
+                #print "Block:", block
+                if e == block[0]:
+                    txt += ['<TR>']
+                    txt += ['<TD VALIGN="top"><B>%s</B></TD>' % s]
+                    txt += ['<TD VALIGN="top"><B>%s</B></TD>' % FormatEvent(e)]
+                    action = ',<BR/>'.join(block[1])
+                    txt += ['<TD VALIGN="top">%s</TD>' % action]
+                    next_state = ''
+                    if len(block) > 2:
+                        next_state = '<B>' + ',<BR>'.join(block[2]) + '</B>'
+                    else:
+                        next_state = s
+                    txt += ['<TD VALIGN="top">%s</TD>' % next_state]
+                    txt += ['</TR>\n']
+    txt += ['</TABLE>\n']
+    return txt
+
 def PrintStateMachine(sm):
     print "Statemachine:"
     for key in sorted(sm.keys()):
@@ -54,13 +144,13 @@ def PrintStateMachine(sm):
         for state in sm['States']:
             print "    %s" % state
             if state in sm['Blocks']:
-                label = ['<TABLE><TH><TD PORT="f0"><B>']
-                label += [' %s' % state]
-                label += ['</B></TD></TH>']
+                label = ['<TABLE><TR><TD PORT="f0"><B>']
+                label += ['%s' % state]
+                label += ['</B></TD></TR>']
                 for idx, event in enumerate(sm['Blocks'][state]):
                     if len(event[1]) > 0:
                         label += ['<TR><TD><TABLE>']
-                        label += ['<TH><TD PORT="f%d"><B>%s</B></TD></TH>' % (idx + 1, FormatEvent(event[0]))]
+                        label += ['<TR><TD PORT="f%d"><B>%s</B></TD></TR>' % (idx + 1, FormatEvent(event[0]))]
                         label += ['<TR><TD>%s</TD></TR>' % '</TD></TR><TR><TD>'.join(event[1])]
                         label += ['</TABLE></TD></TR>']
                     else:
@@ -76,12 +166,7 @@ def PrintStateMachine(sm):
                             txt += ['    %s:f%d -> %s:f0;' % (state, idx + 1, e)]
                     print
     txt += ['}']
-    text = open("prog.dot", "w")
-    text.write('\n'.join(txt))
-    text.close()
-    dot_cmd = "%s -Tsvg -o prog.svg prog.dot" % args.dot
-    print dot_cmd
-    os.system(dot_cmd)
+    return txt
 
 def PrintParseError(message):
     print message
@@ -474,7 +559,30 @@ def process_source(source_file):
         yaccer.parse('\n'.join(SourceData))
     if Verbose:
         print "Statemachine:", Statemachine
-    PrintStateMachine(Statemachine)
+    txt = PrintStateMachine(Statemachine)
+    text = open("%s.dot" % source_file, "w")
+    text.write('\n'.join(txt))
+    text.close()
+    dot_cmd = "%s -Tsvg -o %s.svg %s.dot" % (args.dot, source_file, source_file)
+    print dot_cmd
+    os.system(dot_cmd)
+
+    text = open("%s.html" % source_file, "w")
+    text.write('<HTML>\n')
+    text.write('<TABLE BORDER=8 ALIGN="center"><TR><TD ALIGN="center">State Table 1<BR/>\n')
+    txt = PrintStateTable1(Statemachine)
+    text.write(''.join(txt))
+    text.write('</TD></TR><TR><TD ALIGN="center">State Table 2<BR/>\n')
+    txt = PrintStateTable2(Statemachine)
+    text.write(''.join(txt))
+    text.write('</TD></TR><TR><TD ALIGN="center">State Table 3<BR/>\n')
+    txt = PrintStateTable3(Statemachine)
+    text.write(''.join(txt))
+    text.write('</TD></TR><TR><TD ALIGN="center">State Diagram 1<BR/>\n')
+    text.write('<img src="%s.svg" alt="%s.svg"/>\n' % (source_file, source_file))
+    text.write('</TD></TR></TABLE>\n')
+    text.write('</HTML>\n')
+    text.close()
 
 def main():
     global lexer, yaccer
