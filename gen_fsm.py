@@ -15,6 +15,7 @@ import os
 import re
 import ply.lex as lex
 import ply.yacc as yacc
+from statemachine import StateMachine
 
 Statemachine = None
 lexer = None
@@ -121,6 +122,36 @@ def PrintStateTable3(sm):
                     txt += ['<TD VALIGN="top">%s</TD>' % next_state]
                     txt += ['</TR>\n']
     txt += ['</TABLE>\n']
+    return txt
+
+def PrintStateTable4(sm):
+    txt = ['def StateSwitch_%s(state, event):' % sm['Name']]
+    txt += ['    next_state = state']
+    the_states = sorted(sm['States'])
+    print '**The States:', the_states
+    the_events = []
+    for b in sm['Blocks']:
+        for t in sm['Blocks'][b]:
+            if t[0] not in the_events:
+                the_events.append(t[0])
+    the_events = sorted(the_events)
+    print '**The Events:', [FormatEvent(e) for e in the_events]
+    for s in the_states:
+        txt += ['    if state == "%s":' % s]
+        for e in the_events:
+            for block in sm['Blocks'][s]:
+                #print "Block:", block
+                if e == block[0]:
+                    #txt += ['<TD VALIGN="top"><B>%s</B></TD>' % s]
+                    txt += ['        if event == "%s":' % FormatEvent(e)]
+                    for action in block[1]:
+                        txt += ['            %s(state, event)' % (action)]
+                    if len(block) > 2:
+                        txt += ['            next_state = "%s"' % (block[2][0])]
+                    else:
+                        pass
+    txt += ['    return next_state']
+    txt += ['']
     return txt
 
 def PrintStateMachine(sm):
@@ -569,18 +600,30 @@ def process_source(source_file):
 
     text = open("%s.html" % source_file, "w")
     text.write('<HTML>\n')
-    text.write('<TABLE BORDER=8 ALIGN="center"><TR><TD ALIGN="center">State Table 1<BR/>\n')
+    text.write('<TABLE BORDER=8 ALIGN="center">\n')
+    text.write('<TR><TD ALIGN="left"><PRE>\n')
+    text.write('\n'.join(SourceData))
+    text.write('</TD></TR>\n')
+    text.write('<TR><TD ALIGN="center">State Table 1<BR/>\n')
     txt = PrintStateTable1(Statemachine)
     text.write(''.join(txt))
-    text.write('</TD></TR><TR><TD ALIGN="center">State Table 2<BR/>\n')
+    text.write('</TD></TR>\n')
+    text.write('<TR><TD ALIGN="center">State Table 2<BR/>\n')
     txt = PrintStateTable2(Statemachine)
     text.write(''.join(txt))
-    text.write('</TD></TR><TR><TD ALIGN="center">State Table 3<BR/>\n')
+    text.write('</TD></TR>\n')
+    text.write('<TR><TD ALIGN="center">State Table 3<BR/>\n')
     txt = PrintStateTable3(Statemachine)
     text.write(''.join(txt))
-    text.write('</TD></TR><TR><TD ALIGN="center">State Diagram 1<BR/>\n')
+    text.write('</TD></TR>\n')
+    text.write('<TR><TD ALIGN="left"><PRE>\n')
+    txt = PrintStateTable4(Statemachine)
+    text.write('\n'.join(txt))
+    text.write('</PRE></TD></TR>\n')
+    text.write('<TR><TD ALIGN="center">State Diagram 1<BR/>\n')
     text.write('<img src="%s.svg" alt="%s.svg"/>\n' % (source_file, source_file))
-    text.write('</TD></TR></TABLE>\n')
+    text.write('</TD></TR>\n')
+    text.write('</TABLE>\n')
     text.write('</HTML>\n')
     text.close()
 
