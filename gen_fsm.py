@@ -124,8 +124,11 @@ def PrintStateTable3(sm):
     txt += ['</TABLE>\n']
     return txt
 
-def PrintStateTable4(sm):
-    txt = ['def StateSwitch_%s(state, event):' % sm['Name']]
+def Generate_Python(sm):
+    action_list = []
+    test_list = []
+    func_name = 'StateSwitch_%s'  % sm['Name']
+    txt = ['def %s(state, event):' % func_name]
     txt += ['    next_state = state']
     the_states = sorted(sm['States'])
     print '**The States:', the_states
@@ -146,12 +149,90 @@ def PrintStateTable4(sm):
                     txt += ['        if event == "%s":' % FormatEvent(e)]
                     for action in block[1]:
                         txt += ['            %s(state, event)' % (action)]
+                        if action not in action_list:
+                            action_list.append(action)
                     if len(block) > 2:
                         txt += ['            next_state = "%s"' % (block[2][0])]
+                        txt += ['            return next_state']
+                        test_list.append((s, e, block[2][0]))
                     else:
-                        pass
+                        txt += ['            return next_state']
+                        test_list.append((s, e, s))
     txt += ['    return next_state']
     txt += ['']
+    slen = max([len(s) for s in the_states])
+    elen = max([len(FormatEvent(e)) for e in the_events])
+    txt += ['if __name__ == "__main__":']
+    for action in action_list:
+        txt += ['    def %s(state, event):' % action]
+        line = '"State %%-%ds event %%-%ds: %s" %% (state, event)' % (slen, elen, action)
+        txt += ['        print %s' % line]
+    for test in test_list:
+        s1 = test[0]
+        ev = FormatEvent(test[1])
+        s2 = test[2]
+        txt += ['    assert %s("%s", "%s") == "%s"' % (func_name, s1, ev, s2)]
+    return txt
+
+def Generate_TCL(sm):
+    action_list = []
+    test_list = []
+    func_name = 'StateSwitch_%s'  % sm['Name']
+    txt = ['proc %s {state event} {' % func_name]
+    txt += ['    set next_state ${state}']
+    the_states = sorted(sm['States'])
+    print '**The States:', the_states
+    the_events = []
+    for b in sm['Blocks']:
+        for t in sm['Blocks'][b]:
+            if t[0] not in the_events:
+                the_events.append(t[0])
+    the_events = sorted(the_events)
+    print '**The Events:', [FormatEvent(e) for e in the_events]
+    for s in the_states:
+        txt += ['    if {${state} == "%s"} {' % s]
+        for e in the_events:
+            for block in sm['Blocks'][s]:
+                #print "Block:", block
+                if e == block[0]:
+                    #txt += ['<TD VALIGN="top"><B>%s</B></TD>' % s]
+                    txt += ['        if {${event} == "%s"} {' % FormatEvent(e)]
+                    for action in block[1]:
+                        txt += ['            %s ${state}  ${event}' % (action)]
+                        if action not in action_list:
+                            action_list.append(action)
+                    if len(block) > 2:
+                        txt += ['            set next_state "%s"' % (block[2][0])]
+                        test_list.append((s, e, block[2][0]))
+                    else:
+                        test_list.append((s, e, s))
+                    txt += ['            return ${next_state}']
+                    txt += ['        }']
+        txt += ['        return ${next_state}']
+        txt += ['    }']
+    txt += ['    return ${next_state}']
+    txt += ['}']
+    slen = max([len(s) for s in the_states])
+    elen = max([len(FormatEvent(e)) for e in the_events])
+    txt += ['if { "[lindex [split [info nameofexecutable] "/"] end]" == "tclsh"} {']
+    for action in action_list:
+        txt += ['    proc %s {state event} {' % action]
+        line = 'State [format "%%-%ds" ${state}] event [format "%%-%ds" ${event}]: %s' %\
+                (slen, elen, action)
+        txt += ['        puts "%s"' % line]
+        txt += ['    }']
+    for test in test_list:
+        s1 = test[0]
+        ev = FormatEvent(test[1])
+        s2 = test[2]
+        txt += ['    if {[%s "%s" "%s"] != "%s"} {error "fail!"}' % (func_name, s1, ev, s2)]
+    txt += ['} else {']
+    for action in action_list:
+        if action in sm['Code'] and sm['Code'][action]['type'] == 'action':
+            txt += ['    proc %s {state event} {' % action]
+            txt += ['        ' + s for s in sm['Code'][action]['text']]
+            txt += ['    }']
+    txt += ['}']
     return txt
 
 def PrintStateMachine(sm):
@@ -245,6 +326,7 @@ tokens = [
     'AT_TCL',
     'AT_END',
     'DISPATCH',
+    'CLASSIFIER',
     'TRANSITION',
     ] + list(reserved.values())
 
@@ -307,6 +389,10 @@ def t_TEXT_STRING2(t):
     t.value = t.value[1:-1]
     return t
 
+
+def t_CLASSIFIER(t):
+    r'-->'
+    return t
 
 def t_DISPATCH(t):
     r'->'
@@ -478,6 +564,7 @@ def p_state_code(p):
     '''
     state_code : event_type DISPATCH id_list
                | event_type DISPATCH id_list TRANSITION state_list
+               | event_type CLASSIFIER id_list
     '''
     ReportP(p, "state_code")
     if len(p) > 5:
@@ -600,6 +687,7 @@ def process_source(source_file):
 
     text = open("%s.html" % source_file, "w")
     text.write('<HTML>\n')
+    text.write('<TITLE>Finite State Machine %s</TITLE>\n' % source_file)
     text.write('<TABLE BORDER=8 ALIGN="center">\n')
     text.write('<TR><TD ALIGN="left"><PRE>\n')
     text.write('\n'.join(SourceData))
@@ -617,8 +705,15 @@ def process_source(source_file):
     text.write(''.join(txt))
     text.write('</TD></TR>\n')
     text.write('<TR><TD ALIGN="left"><PRE>\n')
-    txt = PrintStateTable4(Statemachine)
+    txt = Generate_Python(Statemachine)
     text.write('\n'.join(txt))
+    with open('%s.py' % source_file, 'w') as fdo:
+        fdo.write('\n'.join(txt))
+    text.write('<TR><TD ALIGN="left"><PRE>\n')
+    txt = Generate_TCL(Statemachine)
+    text.write('\n'.join(txt))
+    with open('%s.tcl' % source_file, 'w') as fdo:
+        fdo.write('\n'.join(txt))
     text.write('</PRE></TD></TR>\n')
     text.write('<TR><TD ALIGN="center">State Diagram 1<BR/>\n')
     text.write('<img src="%s.svg" alt="%s.svg"/>\n' % (source_file, source_file))
