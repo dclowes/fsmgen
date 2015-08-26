@@ -15,7 +15,7 @@ import os
 import re
 import ply.lex as lex
 import ply.yacc as yacc
-from statemachine import StateMachine
+import statemachine
 
 Statemachine = None
 lexer = None
@@ -47,9 +47,9 @@ def PrintStateTable1(sm):
             txt += ['<TD VALIGN="top"><TABLE>']
             for block in sm['Blocks'][s_curr]:
                 #print "Block:", block
-                if (s_curr == s_next and len(block) < 3) or (len(block) > 2 and s_next in block[2]):
-                    event = FormatEvent(block[0])
-                    action = ',<BR/>'.join(block[1])
+                if (block[0] in [1, 2] and s_curr == s_next) or (block[0] in [3, 4] and s_next in block[3]):
+                    event = FormatEvent(block[1])
+                    action = ',<BR/>'.join(block[2])
                     txt += ['<TR><TD VALIGN="top"><B>%s</B></TD><TD VALIGN="top">%s</TD></TR>' % (event, action)]
             txt += ['</TABLE></TD>']
         txt += ['</TR>\n']
@@ -65,8 +65,8 @@ def PrintStateTable2(sm):
     the_events = []
     for b in sm['Blocks']:
         for t in sm['Blocks'][b]:
-            if t[0] not in the_events:
-                the_events.append(t[0])
+            if t[1] not in the_events:
+                the_events.append(t[1])
     the_events = sorted(the_events)
     print '**The Events:', [FormatEvent(e) for e in the_events]
     for s in the_states:
@@ -78,11 +78,11 @@ def PrintStateTable2(sm):
             txt += ['<TD VALIGN="top"><TABLE>']
             for block in sm['Blocks'][s]:
                 #print "Block:", block
-                if e == block[0]:
-                    action = ',<BR/>'.join(block[1])
+                if e == block[1]:
+                    action = ',<BR/>'.join(block[2])
                     next_state = ''
-                    if len(block) > 2:
-                        next_state = '<B>' + ',<BR>'.join(block[2]) + '</B>'
+                    if block[0] in [3, 4]:
+                        next_state = '<B>' + ',<BR>'.join(block[3]) + '</B>'
                     txt += ['<TR><TD VALIGN="top">%s</TD><TD VALIGN="top">%s</TD></TR>' % (action, next_state)]
             txt += ['</TABLE></TD>']
         txt += ['</TR>\n']
@@ -100,23 +100,23 @@ def PrintStateTable3(sm):
     the_events = []
     for b in sm['Blocks']:
         for t in sm['Blocks'][b]:
-            if t[0] not in the_events:
-                the_events.append(t[0])
+            if t[1] not in the_events:
+                the_events.append(t[1])
     the_events = sorted(the_events)
     print '**The Events:', [FormatEvent(e) for e in the_events]
     for s in the_states:
         for e in the_events:
             for block in sm['Blocks'][s]:
                 #print "Block:", block
-                if e == block[0]:
+                if e == block[1]:
                     txt += ['<TR>']
                     txt += ['<TD VALIGN="top"><B>%s</B></TD>' % s]
                     txt += ['<TD VALIGN="top"><B>%s</B></TD>' % FormatEvent(e)]
-                    action = ',<BR/>'.join(block[1])
+                    action = ',<BR/>'.join(block[2])
                     txt += ['<TD VALIGN="top">%s</TD>' % action]
                     next_state = ''
-                    if len(block) > 2:
-                        next_state = '<B>' + ',<BR>'.join(block[2]) + '</B>'
+                    if block[0] in [3, 4]:
+                        next_state = '<B>' + ',<BR>'.join(block[3]) + '</B>'
                     else:
                         next_state = s
                     txt += ['<TD VALIGN="top">%s</TD>' % next_state]
@@ -126,17 +126,19 @@ def PrintStateTable3(sm):
 
 def Generate_Python(sm):
     action_list = []
+    classifier_list = []
     test_list = []
     func_name = 'StateSwitch_%s'  % sm['Name']
     txt = ['def %s(state, event):' % func_name]
     txt += ['    next_state = state']
+    txt += ['    next_event = None']
     the_states = sorted(sm['States'])
     print '**The States:', the_states
     the_events = []
     for b in sm['Blocks']:
         for t in sm['Blocks'][b]:
-            if t[0] not in the_events:
-                the_events.append(t[0])
+            if t[1] not in the_events:
+                the_events.append(t[1])
     the_events = sorted(the_events)
     print '**The Events:', [FormatEvent(e) for e in the_events]
     for s in the_states:
@@ -144,49 +146,63 @@ def Generate_Python(sm):
         for e in the_events:
             for block in sm['Blocks'][s]:
                 #print "Block:", block
-                if e == block[0]:
+                if e == block[1]:
                     #txt += ['<TD VALIGN="top"><B>%s</B></TD>' % s]
                     txt += ['        if event == "%s":' % FormatEvent(e)]
-                    for action in block[1]:
-                        txt += ['            %s(state, event)' % (action)]
-                        if action not in action_list:
-                            action_list.append(action)
-                    if len(block) > 2:
-                        txt += ['            next_state = "%s"' % (block[2][0])]
-                        txt += ['            return next_state']
-                        test_list.append((s, e, block[2][0]))
+                    for action in block[2]:
+                        if block[0] in [1]:
+                            txt += ['            next_event = %s(state, event)' % (action)]
+                            if action not in [c[0] for c in classifier_list]:
+                                classifier_list.append((action, block[3]))
+                        else:
+                            txt += ['            %s(state, event)' % (action)]
+                            if action not in action_list:
+                                action_list.append(action)
+                    if block[0] in [3, 4]:
+                        txt += ['            next_state = "%s"' % (block[3][0])]
+                        test_list.append((s, e, block[3][0]))
                     else:
-                        txt += ['            return next_state']
                         test_list.append((s, e, s))
-    txt += ['    return next_state']
+                    txt += ['            return (next_state, next_event)']
+    txt += ['    return (next_state, next_event)']
     txt += ['']
     slen = max([len(s) for s in the_states])
     elen = max([len(FormatEvent(e)) for e in the_events])
     txt += ['if __name__ == "__main__":']
+    print "Classifiers:", classifier_list
+    for action in classifier_list:
+        txt += ['    def %s(state, event):' % action[0]]
+        line = '"State %%-%ds event %%-%ds: %s" %% (state, event)' % (slen, elen, action[0])
+        txt += ['        print %s' % line]
+        txt += ['        return "%s"' % action[1][0][0]]
+    print "Actions:", action_list
     for action in action_list:
         txt += ['    def %s(state, event):' % action]
         line = '"State %%-%ds event %%-%ds: %s" %% (state, event)' % (slen, elen, action)
         txt += ['        print %s' % line]
+    print "Tests:", test_list
     for test in test_list:
         s1 = test[0]
         ev = FormatEvent(test[1])
         s2 = test[2]
-        txt += ['    assert %s("%s", "%s") == "%s"' % (func_name, s1, ev, s2)]
+        txt += ['    assert %s("%s", "%s")[0] == "%s"' % (func_name, s1, ev, s2)]
     return txt
 
 def Generate_TCL(sm):
     action_list = []
+    classifier_list = []
     test_list = []
     func_name = 'StateSwitch_%s'  % sm['Name']
     txt = ['proc %s {state event} {' % func_name]
     txt += ['    set next_state ${state}']
+    txt += ['    set next_event {}']
     the_states = sorted(sm['States'])
     print '**The States:', the_states
     the_events = []
     for b in sm['Blocks']:
         for t in sm['Blocks'][b]:
-            if t[0] not in the_events:
-                the_events.append(t[0])
+            if t[1] not in the_events:
+                the_events.append(t[1])
     the_events = sorted(the_events)
     print '**The Events:', [FormatEvent(e) for e in the_events]
     for s in the_states:
@@ -194,27 +210,41 @@ def Generate_TCL(sm):
         for e in the_events:
             for block in sm['Blocks'][s]:
                 #print "Block:", block
-                if e == block[0]:
+                if e == block[1]:
                     #txt += ['<TD VALIGN="top"><B>%s</B></TD>' % s]
                     txt += ['        if {${event} == "%s"} {' % FormatEvent(e)]
-                    for action in block[1]:
-                        txt += ['            %s ${state}  ${event}' % (action)]
-                        if action not in action_list:
-                            action_list.append(action)
-                    if len(block) > 2:
-                        txt += ['            set next_state "%s"' % (block[2][0])]
-                        test_list.append((s, e, block[2][0]))
+                    for action in block[2]:
+                        if block[0] in [1]:
+                            txt += ['            set next_event [%s ${state} ${event}]' % (action)]
+                            if action not in [c[0] for c in classifier_list]:
+                                classifier_list.append((action, block[3]))
+                        else:
+                            txt += ['            %s ${state} ${event}' % (action)]
+                            if action not in action_list:
+                                action_list.append(action)
+                    if block[0] in [3, 4]:
+                        txt += ['            set next_state "%s"' % (block[3][0])]
+                        test_list.append((s, e, block[3][0]))
                     else:
                         test_list.append((s, e, s))
-                    txt += ['            return ${next_state}']
+                    txt += ['            return [list ${next_state} ${next_event}]']
                     txt += ['        }']
-        txt += ['        return ${next_state}']
+        txt += ['        return [list ${next_state} ${next_event}]']
         txt += ['    }']
-    txt += ['    return ${next_state}']
+    txt += ['    return [list ${next_state} ${next_event}]']
     txt += ['}']
     slen = max([len(s) for s in the_states])
     elen = max([len(FormatEvent(e)) for e in the_events])
     txt += ['if { "[lindex [split [info nameofexecutable] "/"] end]" == "tclsh"} {']
+    print "Classifiers:", classifier_list
+    for action in classifier_list:
+        txt += ['    proc %s {state event} {' % action[0]]
+        line = 'State [format "%%-%ds" ${state}] event [format "%%-%ds" ${event}]: %s' %\
+                (slen, elen, action[0])
+        txt += ['        puts "%s"' % line]
+        txt += ['        return "%s"' % action[1][0][0]]
+        txt += ['    }']
+    print "Actions:", action_list
     for action in action_list:
         txt += ['    proc %s {state event} {' % action]
         line = 'State [format "%%-%ds" ${state}] event [format "%%-%ds" ${event}]: %s' %\
@@ -225,7 +255,7 @@ def Generate_TCL(sm):
         s1 = test[0]
         ev = FormatEvent(test[1])
         s2 = test[2]
-        txt += ['    if {[%s "%s" "%s"] != "%s"} {error "fail!"}' % (func_name, s1, ev, s2)]
+        txt += ['    if {[lindex [%s "%s" "%s"] 0] != "%s"} {error "fail!"}' % (func_name, s1, ev, s2)]
     txt += ['} else {']
     for action in action_list:
         if action in sm['Code'] and sm['Code'][action]['type'] == 'action':
@@ -260,23 +290,26 @@ def PrintStateMachine(sm):
                 label += ['%s' % state]
                 label += ['</B></TD></TR>']
                 for idx, event in enumerate(sm['Blocks'][state]):
-                    if len(event[1]) > 0:
+                    if len(event[2]) > 0:
                         label += ['<TR><TD><TABLE>']
-                        label += ['<TR><TD PORT="f%d"><B>%s</B></TD></TR>' % (idx + 1, FormatEvent(event[0]))]
-                        label += ['<TR><TD>%s</TD></TR>' % '</TD></TR><TR><TD>'.join(event[1])]
+                        label += ['<TR><TD PORT="f%d"><B>%s</B></TD></TR>' % (idx + 1, FormatEvent(event[1]))]
+                        label += ['<TR><TD>%s</TD></TR>' % '</TD></TR><TR><TD>'.join(event[2])]
                         label += ['</TABLE></TD></TR>']
                     else:
-                        label += ['<TR><TD PORT="f%d">%s</TD></TR>' % (idx + 1, FormatEvent(event[0]))]
+                        label += ['<TR><TD PORT="f%d">%s</TD></TR>' % (idx + 1, FormatEvent(event[1]))]
                 label += ['</TABLE>']
                 txt += ['  %s[label=<%s>];' % (state, ''.join(label))]
                 for idx, event in enumerate(sm['Blocks'][state]):
-                    print "        %s ->"  % FormatEvent(event[0]),
-                    print "%s" % ", ".join(event[1]),
-                    if len(event) > 2:
-                        print "=> %s" % ", ".join(event[2]),
-                        for e in event[2]:
+                    line = "        %s" % FormatEvent(event[1])
+                    if event[0] in [1]:
+                        line += " --> %s" % ", ".join(event[2])
+                    elif event[0] in [2, 4]:
+                        line += " -> %s" % ", ".join(event[2])
+                    if event[0] in [3, 4]:
+                        line += " => %s" % ", ".join(event[3])
+                        for e in event[3]:
                             txt += ['    %s:f%d -> %s:f0;' % (state, idx + 1, e)]
-                    print
+                    print line
     txt += ['}']
     return txt
 
@@ -562,17 +595,37 @@ def p_state_code_list(p):
 
 def p_state_code(p):
     '''
-    state_code : event_type DISPATCH id_list
-               | event_type DISPATCH id_list TRANSITION state_list
-               | event_type CLASSIFIER id_list
+    state_code : state_code_1
+               | state_code_2
+               | state_code_3
+               | state_code_4
+    '''
+    p[0] = p[1]
+
+def p_state_code_1(p): # Classifier
+    '''
+    state_code_1 : event_type CLASSIFIER id_or_str TRANSITION event_list
+    '''
+    p[0] = [1, p[1], [p[3]], p[5]]
+
+def p_state_code_2(p): # Action only
+    '''
+    state_code_2 : event_type DISPATCH id_list
+    '''
+    p[0] = [2, p[1], p[3], []]
+
+def p_state_code_3(p): # Transition only
+    '''
+    state_code_3 : event_type TRANSITION state_list
+    '''
+    p[0] = [3, p[1], [], p[3]]
+
+def p_state_code_4(p): # Action and Transition
+    '''
+    state_code_4 : event_type DISPATCH id_list TRANSITION state_list
     '''
     ReportP(p, "state_code")
-    if len(p) > 5:
-        p[0] = [p[1], p[3], p[5]]
-    elif len(p) > 2:
-        p[0] = [p[1], p[3]]
-    else:
-        p[0] = []
+    p[0] = [4, p[1], p[3], p[5]]
 
 def p_id_list(p):
     '''
