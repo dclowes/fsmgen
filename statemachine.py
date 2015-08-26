@@ -44,12 +44,31 @@ class Transition(object):
     def __repr__(self):
         return ", ".join([self.source, self.event, self.actions, self.targets])
 
+class Classifier(object):
+    def __init__(self, source, event, actions=None, targets=None):
+        self.source = source
+        self.event = event
+        self.actions = actions
+        self.targets = targets
+
+    def __repr__(self):
+        return ", ".join([self.source, self.event, self.actions, self.targets])
+
+class Action(object):
+    def __init__(self, code_type, code_text=None):
+        self.code_type = code_type
+        self.code_text = code_text
+
+    def __repr__(self):
+        return "%s:%s" % (self.code_type, self.code_text)
+
 class StateMachine(object):
     def __init__(self, name):
         self.name = name
         self.events = []
         self.states = []
         self.transitions = []
+        self.classifiers = []
 
     def addEvent(self, event):
         assert isinstance(event, Event)
@@ -70,18 +89,30 @@ class StateMachine(object):
         else:
             print "Duplicate transition:", transition
 
+    def addClassifier(self, classifier):
+        assert isinstance(classifier, Classifier)
+        assert classifier.source in [s.name for s in self.states]
+        assert classifier.event in [e.name for e in self.events]
+        if (classifier.source, classifier.event) not in [(t.source, t.event) for t in self.classifiers]:
+            self.classifiers.append(classifier)
+        else:
+            print "Duplicate classifier:", classifier
+
     def printit(self):
         print "StateMachine:", self.name
         print "States:", ", ".join([repr(s) for s in self.states])
         print "Events:", ", ".join([repr(s) for s in self.events])
         for t in self.transitions:
-            print t
+            print "Transition:", t
+        for c in self.classifiers:
+            print "Classifier:", c
 
 if __name__ == "__main__":
     print Event("test")
     print Event("test", ['with', 'args'])
     print State("Idle")
     print Transition("Idle", "test", "none", "Error")
+    print Classifier("Idle", "test", "classify_me", "sub_event")
     print StateMachine("fred")
     sm = StateMachine("fred")
     sm.addEvent(Event("fredEvent"))
@@ -91,4 +122,5 @@ if __name__ == "__main__":
     sm.addTransition(Transition("fredState", "billEvent", "do_something", "billState"))
     sm.addTransition(Transition("billState", "fredEvent", "do_something", "fredState"))
     sm.addTransition(Transition("billState", "fredEvent", "do_something", "fredState"))
+    sm.addClassifier(Classifier("billState", "fredEvent", "do_decide", "nextEvent"))
     sm.printit()
