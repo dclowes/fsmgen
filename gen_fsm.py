@@ -18,6 +18,7 @@ import ply.yacc as yacc
 import statemachine
 
 Statemachine = None
+Statemachines = []
 lexer = None
 yaccer = None
 Verbose = None
@@ -28,101 +29,43 @@ states = (
     )
 
 def FormatEvent(event):
-    if len(event) > 1:
+    if len(event) > 1 and len(event[1]) > 0:
         txt = "%s(%s)" % (event[0], ", ".join(event[1]))
     else:
         txt = "%s" % (event[0])
     return txt
 
-def PrintStateTable1(sm):
-    txt = ['<TABLE BORDER=1>\n']
-    txt += ['<TR>']
-    txt += ['<TH><TABLE WIDTH=100%%><TR><TD ALIGN="right">%s</TD></TR><TR><TD ALIGN="left">%s</TD></TR></TABLE></TH>' % ('Next(&gt;)', 'Current(v)')]
-    for s_next in sorted(sm['States']):
-        txt += ['<TH>%s</TH>' % s_next]
-    txt += ['</TR>\n']
-    for s_curr in sorted(sm['States']):
-        txt += ['<TR><TD VALIGN="top"><B>%s</B></TD>' % s_curr]
-        for s_next in sorted(sm['States']):
-            txt += ['<TD VALIGN="top"><TABLE>']
-            for block in sm['Blocks'][s_curr]:
-                #print "Block:", block
-                if (block[0] in [1, 2] and s_curr == s_next) or (block[0] in [3, 4] and s_next in block[3]):
-                    event = FormatEvent(block[1])
-                    action = ',<BR/>'.join(block[2])
-                    txt += ['<TR><TD VALIGN="top"><B>%s</B></TD><TD VALIGN="top">%s</TD></TR>' % (event, action)]
-            txt += ['</TABLE></TD>']
-        txt += ['</TR>\n']
-    txt += ['</TABLE>\n']
-    return txt
-
-def PrintStateTable2(sm):
-    txt = ['<TABLE BORDER=1>\n']
-    txt += ['<TR>']
-    txt += ['<TH><TABLE WIDTH=100%%><TR><TD VALIGN="right">%s</TD></TR><TR><TD VALIGN="left">%s</TD></TR></TABLE></TH>' % ('State(&gt;)', 'Event(v)')]
+def Build_StateMachine(sm):
+    action_list = []
+    classifier_list = []
+    test_list = []
+    new_sm = statemachine.StateMachine(sm['Name'])
     the_states = sorted(sm['States'])
     print '**The States:', the_states
+    for s in the_states:
+        new_sm.addState(statemachine.State(s))
     the_events = []
     for b in sm['Blocks']:
+        print "**The Block:", b
         for t in sm['Blocks'][b]:
+            print "**The Transit:", t
             if t[1] not in the_events:
                 the_events.append(t[1])
-    the_events = sorted(the_events)
-    print '**The Events:', [FormatEvent(e) for e in the_events]
-    for s in the_states:
-        txt += ['<TH>%s</TH>' % s]
-    txt += ['</TR>\n']
-    for e in the_events:
-        txt += ['<TR><TD VALIGN="top"><B>%s</B></TD>' % FormatEvent(e)]
-        for s in the_states:
-            txt += ['<TD VALIGN="top"><TABLE>']
-            for block in sm['Blocks'][s]:
-                #print "Block:", block
-                if e == block[1]:
-                    action = ',<BR/>'.join(block[2])
-                    next_state = ''
-                    if block[0] in [3, 4]:
-                        next_state = '<B>' + ',<BR>'.join(block[3]) + '</B>'
-                    txt += ['<TR><TD VALIGN="top">%s</TD><TD VALIGN="top">%s</TD></TR>' % (action, next_state)]
-            txt += ['</TABLE></TD>']
-        txt += ['</TR>\n']
-    txt += ['</TABLE>\n']
-    return txt
+                if len(t[1]) > 1:
+                    the_args = t[1][1]
+                else:
+                    the_args = []
+                new_sm.addEvent(statemachine.Event(t[1][0], the_args))
+            if t[0] == 1:
+                new_sm.addClassifier(statemachine.Classifier(b, t[1][0], t[2], t[3]))
+            else:
+                new_sm.addTransition(statemachine.Transition(b, t[1][0], t[2], t[3]))
 
-def PrintStateTable3(sm):
-    txt = ['<TABLE BORDER=1>\n']
-    txt += ['<TR>']
-    for t in ['State', 'Event', 'Actions', 'Next']:
-        txt += ['<TH>%s</TH>' % t]
-    txt += ['</TR>\n']
-    the_states = sorted(sm['States'])
-    print '**The States:', the_states
-    the_events = []
-    for b in sm['Blocks']:
-        for t in sm['Blocks'][b]:
-            if t[1] not in the_events:
-                the_events.append(t[1])
     the_events = sorted(the_events)
     print '**The Events:', [FormatEvent(e) for e in the_events]
-    for s in the_states:
-        for e in the_events:
-            for block in sm['Blocks'][s]:
-                #print "Block:", block
-                if e == block[1]:
-                    txt += ['<TR>']
-                    txt += ['<TD VALIGN="top"><B>%s</B></TD>' % s]
-                    txt += ['<TD VALIGN="top"><B>%s</B></TD>' % FormatEvent(e)]
-                    action = ',<BR/>'.join(block[2])
-                    txt += ['<TD VALIGN="top">%s</TD>' % action]
-                    next_state = ''
-                    if block[0] in [3, 4]:
-                        next_state = '<B>' + ',<BR>'.join(block[3]) + '</B>'
-                    else:
-                        next_state = s
-                    txt += ['<TD VALIGN="top">%s</TD>' % next_state]
-                    txt += ['</TR>\n']
-    txt += ['</TABLE>\n']
-    return txt
+
+    new_sm.printit()
+    return new_sm
 
 def Generate_Python(sm):
     action_list = []
@@ -508,6 +451,8 @@ def p_fsm(p):
     if Verbose:
         print "Statemachine:", p[0]
     Statemachine['Name'] = p[2]
+    new_sm = Build_StateMachine(Statemachine)
+    Statemachines.append(new_sm)
 
 def p_fsm_block(p):
     'fsm_block : LBRACE fsm_statement_list RBRACE'
@@ -573,7 +518,7 @@ def p_event_type(p):
     if len(p) > 2:
         p[0] = [p[1], p[3]]
     else:
-        p[0] = [p[1]]
+        p[0] = [p[1], []]
 
 def p_state_block(p):
     '''
@@ -738,6 +683,7 @@ def process_source(source_file):
     print dot_cmd
     os.system(dot_cmd)
 
+    new_sm = statemachine.StateMachine_Text(Statemachines[0])
     text = open("%s.html" % source_file, "w")
     text.write('<HTML>\n')
     text.write('<TITLE>Finite State Machine %s</TITLE>\n' % source_file)
@@ -746,16 +692,16 @@ def process_source(source_file):
     text.write('\n'.join(SourceData))
     text.write('</TD></TR>\n')
     text.write('<TR><TD ALIGN="center">State Table 1<BR/>\n')
-    txt = PrintStateTable1(Statemachine)
-    text.write(''.join(txt))
+    txt = new_sm.StateTable1()
+    text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
     text.write('<TR><TD ALIGN="center">State Table 2<BR/>\n')
-    txt = PrintStateTable2(Statemachine)
-    text.write(''.join(txt))
+    txt = new_sm.StateTable2()
+    text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
     text.write('<TR><TD ALIGN="center">State Table 3<BR/>\n')
-    txt = PrintStateTable3(Statemachine)
-    text.write(''.join(txt))
+    txt = new_sm.StateTable3()
+    text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
     text.write('<TR><TD ALIGN="left"><PRE>\n')
     txt = Generate_Python(Statemachine)
