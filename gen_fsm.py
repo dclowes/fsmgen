@@ -60,6 +60,11 @@ def Build_StateMachine(sm):
                 new_sm.addClassifier(statemachine.Classifier(b, t[1][0], t[2], t[3]))
             else:
                 new_sm.addTransition(statemachine.Transition(b, t[1][0], t[2], t[3]))
+    for c in sm['Code']:
+        code = sm['Code'][c]
+        print "**The Code:", c, code
+        action = statemachine.Action(code['name'], code['type'], code['text'])
+        new_sm.addAction(action)
 
     the_events = sorted(the_events)
     print '**The Events:', [FormatEvent(e) for e in the_events]
@@ -202,9 +207,13 @@ def Generate_TCL(sm):
     txt += ['} else {']
     for action in action_list:
         if action in sm['Code'] and sm['Code'][action]['type'] == 'action':
-            txt += ['    proc %s {state event} {' % action]
-            txt += ['        ' + s for s in sm['Code'][action]['text']]
-            txt += ['    }']
+            block = sm['Code'][action]
+            print "Action:", action, block
+            if block['text'][0] == "TCL":
+                code = block['text'][1]
+                txt += ['    proc %s {state event} {' % action]
+                txt += ['        ' + l for l in code]
+                txt += ['    }']
     txt += ['}']
     return txt
 
@@ -611,7 +620,7 @@ def p_tcl_code_block(p):
     tcl_code_block : AT_TCL code_list AT_END
     '''
     ReportP(p, "tcl_code_block")
-    p[0] = p[2]
+    p[0] = ['TCL', p[2]]
 
 def p_code_list(p):
     '''
@@ -675,7 +684,7 @@ def process_source(source_file):
         yaccer.parse('\n'.join(SourceData))
     if Verbose:
         print "Statemachine:", Statemachine
-    new_sm = statemachine.StateMachine_Text(Statemachines[0])
+    new_sm = statemachine.StateMachine_Python(Statemachines[0])
 
     txt = PrintStateMachine(Statemachine)
     text = open("%s.dot" % source_file, "w")
@@ -697,41 +706,71 @@ def process_source(source_file):
     text.write('<HTML>\n')
     text.write('<TITLE>Finite State Machine %s</TITLE>\n' % source_file)
     text.write('<TABLE BORDER=8 ALIGN="center">\n')
-    text.write('<TR><TD><TABLE BORDER=0 ALIGN="center">\n')
+
     text.write('<TR><TD ALIGN="left">\n')
-    text.write('<PRE>' + '\n'.join(SourceData) + '</PRE>')
-    text.write('</TD><TD>\n')
-    text.write('<PRE>' + '\n'.join(new_sm.TextStateMachine()) + '</PRE>')
+    text.write('<TABLE BORDER=0 ALIGN="center">\n')
+    text.write('<TR><TD ALIGN="left">\n')
+    text.write('<PRE>\n' + '\n'.join(SourceData) + '\n</PRE>\n')
+    text.write('</TD><TD ALIGN="left">\n')
+    text.write('<PRE>\n' + '\n'.join(new_sm.TextStateMachine()) + '\n</PRE>\n')
     text.write('</TD></TR></TABLE>\n')
+    text.write('</TD></TR>\n')
+
     text.write('<TR><TD ALIGN="center">State Table 1<BR/>\n')
     txt = new_sm.StateTable1()
     text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
+
     text.write('<TR><TD ALIGN="center">State Table 2<BR/>\n')
     txt = new_sm.StateTable2()
     text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
+
     text.write('<TR><TD ALIGN="center">State Table 3<BR/>\n')
     txt = new_sm.StateTable3()
     text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
+
     text.write('<TR><TD ALIGN="left">\n')
+    txt = new_sm.Generate_Python()
+    with open('%s.new.py' % source_file, 'w') as fdo:
+        fdo.write('\n'.join(txt))
     txt = Generate_Python(Statemachine)
     with open('%s.py' % source_file, 'w') as fdo:
         fdo.write('\n'.join(txt))
     text.write('<PRE>' + '\n'.join(txt) + '</PRE>')
+    text.write('</TD></TR>\n')
+
     text.write('<TR><TD ALIGN="left">\n')
+    txt = new_sm.Generate_TCL()
+    with open('%s.new.tcl' % source_file, 'w') as fdo:
+        fdo.write('\n'.join(txt))
     txt = Generate_TCL(Statemachine)
-    text.write('<PRE>' + '\n'.join(txt) + '</PRE>')
     with open('%s.tcl' % source_file, 'w') as fdo:
         fdo.write('\n'.join(txt))
+    text.write('<PRE>' + '\n'.join(txt) + '</PRE>')
     text.write('</TD></TR>\n')
+
+    hdr, txt = new_sm.Generate_C()
+    with open('%s.h' % new_sm.name, 'w') as fdo:
+        fdo.write('\n'.join(hdr))
+    with open('%s.c' % new_sm.name, 'w') as fdo:
+        fdo.write('\n'.join(txt))
+    text.write('<TR><TD ALIGN="left">\n')
+    text.write('<PRE>' + '\n'.join(hdr) + '</PRE>')
+    text.write('</TD></TR>\n')
+    text.write('<TR><TD ALIGN="left">\n')
+    text.write('<PRE>' + '\n'.join(txt) + '</PRE>')
+    text.write('</TD></TR>\n')
+
     text.write('<TR><TD ALIGN="center">State Diagram New 1<BR/>\n')
     text.write('<img src="%s.new.svg" alt="%s.new.svg"/>\n' % (source_file, source_file))
     text.write('</TD></TR>\n')
+
     text.write('<TR><TD ALIGN="center">State Diagram 1<BR/>\n')
     text.write('<img src="%s.svg" alt="%s.svg"/>\n' % (source_file, source_file))
     text.write('</TD></TR>\n')
+
     text.write('</TABLE>\n')
     text.write('</HTML>\n')
     text.close()
