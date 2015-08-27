@@ -125,13 +125,14 @@ class StateMachine_Text(StateMachine):
             self.classifiers = other.classifiers
 
     def StateTable1(self):
+        the_states = sorted([s.name for s in self.states])
+        print '**The States:', the_states
         txt = ['<TABLE BORDER=1>']
         txt += ['<TR>']
         txt += ['<TH><TABLE WIDTH=100%>']
         txt += ['<TR><TD ALIGN="right">Next(&gt;)</TD></TR>']
         txt += ['<TR><TD ALIGN="left">Current(v)</TD></TR>']
         txt += ['</TABLE></TH>']
-        the_states = sorted([s.name for s in self.states])
         for s_next in the_states:
             txt += ['<TH>%s</TH>' % s_next]
         txt += ['</TR>\n']
@@ -158,16 +159,16 @@ class StateMachine_Text(StateMachine):
         return txt
 
     def StateTable2(self):
+        the_states = sorted([s.name for s in self.states])
+        the_events = sorted([e.name for e in self.events])
+        print '**The States:', the_states
+        print '**The Events:', the_events
         txt = ['<TABLE BORDER=1>']
         txt += ['<TR>']
         txt += ['<TH><TABLE WIDTH=100%>']
         txt += ['<TR><TD VALIGN="right">State(&gt;)</TD></TR>']
         txt += ['<TR><TD VALIGN="left">Event(v)</TD></TR>']
         txt += ['</TABLE></TH>']
-        the_states = sorted([s.name for s in self.states])
-        the_events = sorted([e.name for e in self.events])
-        print '**The States:', the_states
-        print '**The Events:', the_events
         for s in the_states:
             txt += ['<TH>%s</TH>' % s]
         txt += ['</TR>\n']
@@ -189,15 +190,15 @@ class StateMachine_Text(StateMachine):
         return txt
 
     def StateTable3(self):
+        the_states = sorted([s.name for s in self.states])
+        the_events = sorted([e.name for e in self.events])
+        print '**The States:', the_states
+        print '**The Events:', the_events
         txt = ['<TABLE BORDER=1>\n']
         txt += ['<TR>']
         for t in ['State', 'Event', 'Actions', 'Next']:
             txt += ['<TH>%s</TH>' % t]
         txt += ['</TR>\n']
-        the_states = sorted([s.name for s in self.states])
-        the_events = sorted([e.name for e in self.events])
-        print '**The States:', the_states
-        print '**The Events:', the_events
         for s in the_states:
             for e in the_events:
                 for block in [b for b in self.classifiers + self.transitions if b.source == s]:
@@ -216,6 +217,70 @@ class StateMachine_Text(StateMachine):
                         txt += ['<TD VALIGN="top">%s</TD>' % next_state]
                         txt += ['</TR>\n']
         txt += ['</TABLE>\n']
+        return txt
+
+    def DotStateMachine(self):
+        the_states = sorted([s.name for s in self.states])
+        the_events = sorted([e.name for e in self.events])
+        print '**The States:', the_states
+        print '**The Events:', the_events
+        txt = ['digraph G {']
+        txt += ['  size="11,8";']
+        txt += ['  ratio="expand";']
+        txt += ['  rankdir=LR;']
+        txt += ['  node [shape=plaintext];']
+        txt += ['  labelloc="t";']
+        txt += ['  label=<<B>%s</B>>' % self.name]
+        txt += ['']
+        for state in the_states:
+            label = ['<TABLE><TR><TD PORT="f0"><B>']
+            label += ['%s' % state]
+            label += ['</B></TD></TR>']
+            the_blocks = [b for b in self.classifiers if b.source == state]
+            the_blocks += [b for b in self.transitions if b.source == state]
+            for idx, block in enumerate(the_blocks):
+                label += ['<TR><TD><TABLE>']
+                label += ['<TR><TD PORT="f%d">' % (idx + 1)]
+                label += ['<B>%s</B></TD></TR>' % block.event]
+                if len(block.actions) > 0:
+                    label += ['<TR><TD>%s</TD></TR>' % '</TD></TR><TR><TD>'.join(block.actions)]
+                label += ['</TABLE></TD></TR>']
+            label += ['</TABLE>']
+            txt += ['  %s[label=<%s>];' % (state, ''.join(label))]
+            for idx, block in enumerate(the_blocks):
+                if isinstance(block, Transition):
+                    for t in block.targets:
+                        txt += ['    %s:f%d -> %s:f0;' % (state, idx + 1, t)]
+        txt += ['}']
+        return txt
+
+    def TextStateMachine(self):
+        the_states = sorted([s.name for s in self.states])
+        the_events = sorted([e.name for e in self.events])
+        print '**The States:', the_states
+        print '**The Events:', the_events
+        txt = ['STATEMACHINE %s {' % self.name]
+        txt += ['  STATES\n    %s;' % ',\n    '.join(the_states)]
+        txt += ['  EVENTS\n    %s;' % ',\n    '.join(the_events)]
+        for state in the_states:
+            txt += ['  State %s = {' % state]
+            the_blocks = [b for b in self.classifiers if b.source == state]
+            the_blocks += [b for b in self.transitions if b.source == state]
+            for block in the_blocks:
+                line = '%s' % block.event
+                if isinstance(block, Classifier):
+                    line += ' --> %s' % ', '.join(block.actions)
+                    if len(block.targets) > 0:
+                        next_events = sorted([e[0] for e in block.targets])
+                        line += ' => %s' % ', '.join(next_events)
+                else:
+                    if len(block.actions) > 0:
+                        line += ' -> %s' % ', '.join(block.actions)
+                    if len(block.targets) > 0:
+                        line += ' => %s' % ', '.join(block.targets)
+                txt += ['    %s;' % line]
+            txt += ['  }']
+        txt += ['}']
         return txt
 
 if __name__ == "__main__":

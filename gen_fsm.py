@@ -226,7 +226,7 @@ def PrintStateMachine(sm):
         print "Events:", ", ".join([FormatEvent(e) for e in sorted(sm['Events'])])
     if len(sm['States']) > 0:
         print "States:", ", ".join(sorted(sm['States']))
-        for state in sm['States']:
+        for state in sorted(sm['States']):
             print "    %s" % state
             if state in sm['Blocks']:
                 label = ['<TABLE><TR><TD PORT="f0"><B>']
@@ -675,6 +675,8 @@ def process_source(source_file):
         yaccer.parse('\n'.join(SourceData))
     if Verbose:
         print "Statemachine:", Statemachine
+    new_sm = statemachine.StateMachine_Text(Statemachines[0])
+
     txt = PrintStateMachine(Statemachine)
     text = open("%s.dot" % source_file, "w")
     text.write('\n'.join(txt))
@@ -683,14 +685,24 @@ def process_source(source_file):
     print dot_cmd
     os.system(dot_cmd)
 
-    new_sm = statemachine.StateMachine_Text(Statemachines[0])
+    txt = new_sm.DotStateMachine()
+    text = open("%s.new.dot" % source_file, "w")
+    text.write('\n'.join(txt))
+    text.close()
+    dot_cmd = "%s -Tsvg -o %s.new.svg %s.new.dot" % (args.dot, source_file, source_file)
+    print dot_cmd
+    os.system(dot_cmd)
+
     text = open("%s.html" % source_file, "w")
     text.write('<HTML>\n')
     text.write('<TITLE>Finite State Machine %s</TITLE>\n' % source_file)
     text.write('<TABLE BORDER=8 ALIGN="center">\n')
-    text.write('<TR><TD ALIGN="left"><PRE>\n')
-    text.write('\n'.join(SourceData))
-    text.write('</TD></TR>\n')
+    text.write('<TR><TD><TABLE BORDER=0 ALIGN="center">\n')
+    text.write('<TR><TD ALIGN="left">\n')
+    text.write('<PRE>' + '\n'.join(SourceData) + '</PRE>')
+    text.write('</TD><TD>\n')
+    text.write('<PRE>' + '\n'.join(new_sm.TextStateMachine()) + '</PRE>')
+    text.write('</TD></TR></TABLE>\n')
     text.write('<TR><TD ALIGN="center">State Table 1<BR/>\n')
     txt = new_sm.StateTable1()
     text.write('\n'.join(txt))
@@ -703,17 +715,20 @@ def process_source(source_file):
     txt = new_sm.StateTable3()
     text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
-    text.write('<TR><TD ALIGN="left"><PRE>\n')
+    text.write('<TR><TD ALIGN="left">\n')
     txt = Generate_Python(Statemachine)
-    text.write('\n'.join(txt))
     with open('%s.py' % source_file, 'w') as fdo:
         fdo.write('\n'.join(txt))
-    text.write('<TR><TD ALIGN="left"><PRE>\n')
+    text.write('<PRE>' + '\n'.join(txt) + '</PRE>')
+    text.write('<TR><TD ALIGN="left">\n')
     txt = Generate_TCL(Statemachine)
-    text.write('\n'.join(txt))
+    text.write('<PRE>' + '\n'.join(txt) + '</PRE>')
     with open('%s.tcl' % source_file, 'w') as fdo:
         fdo.write('\n'.join(txt))
-    text.write('</PRE></TD></TR>\n')
+    text.write('</TD></TR>\n')
+    text.write('<TR><TD ALIGN="center">State Diagram New 1<BR/>\n')
+    text.write('<img src="%s.new.svg" alt="%s.new.svg"/>\n' % (source_file, source_file))
+    text.write('</TD></TR>\n')
     text.write('<TR><TD ALIGN="center">State Diagram 1<BR/>\n')
     text.write('<img src="%s.svg" alt="%s.svg"/>\n' % (source_file, source_file))
     text.write('</TD></TR>\n')
