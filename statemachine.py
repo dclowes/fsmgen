@@ -447,6 +447,10 @@ class StateMachine_Python(StateMachine_Text):
         for idx, action in enumerate(the_actions):
             hdr += ['    %s = %d,' % (action, idx + 1)]
         hdr += ['};']
+        hdr += ['typedef struct {']
+        for idx, action in enumerate(the_actions):
+            hdr += ['    int (*%s)(enum %s_STATES si, enum %s_EVENTS ei);' % (action, uname, uname)]
+        hdr += ['} %s_ACTION_TABLE;' % uname]
         hdr += ['#endif /* %s_H */' % uname]
 
         txt = ['#include "%s.h"' % self.name]
