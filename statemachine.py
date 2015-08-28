@@ -431,8 +431,10 @@ class StateMachine_Python(StateMachine_Text):
         uname = self.name.upper()
         hdr = ['#ifndef %s_H' % uname]
         hdr += ['#define %s_H' % uname]
+        hdr += ['#include "statemachine.h"']
         hdr += ['#define %s_NUM_STATES %d' % (uname, len(the_states))]
         hdr += ['#define %s_NUM_EVENTS %d' % (uname, len(the_events))]
+        hdr += ['#define %s_NUM_TRANS %d' % (uname, len(the_blocks))]
         hdr += ['#define %s_NUM_ACTIONS %d' % (uname, len(the_actions))]
         hdr += ['#define %s_MAX_ACTIONS %d' % (uname, max_actions)]
         hdr += ['enum %s_STATES {' % uname]
@@ -442,76 +444,99 @@ class StateMachine_Python(StateMachine_Text):
         hdr += ['enum %s_EVENTS {' % uname]
         for idx, event in enumerate(the_events):
             hdr += ['    %s = %d,' % (event, idx + 1)]
-        hdr += ['};']
+        hdr += ['};', '']
         hdr += ['enum %s_ACTIONS {' % uname]
         for idx, action in enumerate(the_actions):
             hdr += ['    %s = %d,' % (action, idx + 1)]
-        hdr += ['};']
-        hdr += ['typedef struct {']
-        for idx, action in enumerate(the_actions):
-            hdr += ['    int (*%s)(enum %s_STATES si, enum %s_EVENTS ei);' % (action, uname, uname)]
-        hdr += ['} %s_ACTION_TABLE;' % uname]
+        hdr += ['};', '']
         hdr += ['#endif /* %s_H */' % uname]
 
         txt = ['#include "%s.h"' % self.name]
         txt += ['#include <stdlib.h>']
         txt += ['#include <stdio.h>']
-        txt += ['typedef struct {']
-        txt += ['    enum %s_STATES si;' % uname]
-        txt += ['    enum %s_EVENTS ei;' % uname]
-        txt += ['    enum %s_ACTIONS ac[%s_MAX_ACTIONS];' % (uname, uname)]
-        txt += ['    enum %s_STATES so;' % uname]
-        txt += ['} trans_t;']
-        txt += ['static trans_t trans_table[] = {']
-        idx = 0
+        txt += ['']
+        tab_idx = 0
+        act_idx = 0
+        act_txt = ['static int action_table[] = {']
         map_txt = ['static int map_table[] = {', '    0,']
+        tab_txt = ['static fsmTransTab trans_table[] = {']
         for state in the_states:
-            map_txt += ['    %d, /* %s */' % (idx, state)]
+            map_txt += ['    %d, /* %s */' % (tab_idx, state)]
             for event in the_events:
                 for block in the_blocks:
                     if block.source == state:
                         if block.event == event:
                             actions = ','.join(block.actions)
+                            act_cnt = len(block.actions)
                             target = "0"
                             if isinstance(block, Transition) and len(block.targets) > 0:
                                 target = block.targets[0]
-                            line = '{%s, %s, {%s}, %s},' % (state, event, actions, target)
-                            line = '%-60s /* %d %s */' % (line, idx, repr(block))
-                            txt += [line]
-                            idx += 1
-        txt += ['};']
-        map_txt += ['    %d' % idx]
-        map_txt += ['};']
+                            if act_cnt > 0:
+                                act_txt += ['    %s,' % actions]
+                            if isinstance(block, Transition):
+                                act_typ = 'fsmActionTrans'
+                            else:
+                                act_typ = 'fsmActionClass'
+                            line = '    {%s, %s, %s, %s, %d, %d},' %\
+                                    (state, event, target, act_typ, act_idx, act_cnt)
+                            line = '%-60s /* %d %s */' % (line, tab_idx, repr(block))
+                            tab_txt += [line]
+                            act_idx += act_cnt
+                            tab_idx += 1
+        act_txt += ['};', '']
+        map_txt += ['    %d' % tab_idx]
+        map_txt += ['};', '']
+        tab_txt += ['};', '']
+        txt += act_txt
         txt += map_txt
+        txt += tab_txt
         txt += ['']
         txt += ['static char *state_names[] = {', '    0,']
         for state in the_states:
             txt += ['    "%s",' % state]
-        txt += ['    0', '};']
+        txt += ['    0', '};', '']
         txt += ['static char *event_names[] = {', '    0,']
         for event in the_events:
             txt += ['    "%s",' % event]
-        txt += ['    0', '};']
+        txt += ['    0', '};', '']
         txt += ['static char *action_names[] = {', '    0,']
         for action in the_actions:
             txt += ['    "%s",' % action]
-        txt += ['    0', '};']
+        txt += ['    0', '};', '']
+        txt += ['struct fsmActionTab_t {']
+        txt += ['    fsmActionFunc *action;']
+        txt += ['};', '']
+        txt += ['static fsmActionFunc (*action_funcs[%s_NUM_ACTIONS+1]);' % uname]
         txt += ['']
+        txt += ['static fsmStateMachine sm_%s = {' % self.name]
+        txt += ['    .name="%s",' % self.name]
+        txt += ['    %s_NUM_STATES,' % uname]
+        txt += ['    %s_NUM_EVENTS,' % uname]
+        txt += ['    %s_NUM_TRANS,' % uname]
+        txt += ['    %s_NUM_ACTIONS,' % uname]
+        txt += ['    %s_MAX_ACTIONS,' % uname]
+        txt += ['    map_table,']
+        txt += ['    action_table,']
+        txt += ['    state_names,']
+        txt += ['    event_names,']
+        txt += ['    action_names,']
+        txt += ['    trans_table,']
+        txt += ['    action_funcs']
+        txt += ['};', '']
         txt += ['int trans_fn(int state, int event) {']
         txt += ['    int i;']
         txt += ['    for (i = map_table[state]; i < map_table[state + 1]; ++i) {']
-        txt += ['        if (trans_table[i].si == state && trans_table[i].ei == event)']
+        txt += ['        if (trans_table[i].ei == event)']
         txt += ['            return i;']
         txt += ['    }']
         txt += ['    return -1;']
-        txt += ['}']
+        txt += ['}', '']
         txt += ['void print_tfr(int j) {']
         txt += ['    int k;']
         txt += ['    printf("%s(%s)", state_names[trans_table[j].si], event_names[trans_table[j].ei]);']
-        txt += ['    for (k = 0; k < %s_MAX_ACTIONS; ++k) {' % uname]
-        txt += ['        char *action = action_names[trans_table[j].ac[k]];']
-        txt += ['        if (trans_table[j].ac[k] == 0)']
-        txt += ['            break;']
+        txt += ['    for (k = 0; k < trans_table[j].ac_count; ++k) {']
+        txt += ['        int act = trans_table[j].ac_start + k;']
+        txt += ['        char *action = action_names[action_table[act]];']
         txt += ['        printf("%s%s", k == 0 ? ": " : ", ", action);']
         txt += ['    }']
         txt += ['    if (trans_table[j].so) {']
@@ -522,6 +547,7 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['']
         txt += ['int main(int argc, char *argv[]) {']
         txt += ['    int i, j, k;']
+        txt += ['    fsmInstance sm = fsmMakeInstance(sm_%s, %s);' % (self.name, 'XX')]
         txt += ['    for (i = 0; i < %s_NUM_STATES; ++i) {' % uname]
         txt += ['        int state = i + 1;']
         txt += ['        printf("STATE: %s\\n", state_names[state]);']
