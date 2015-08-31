@@ -417,7 +417,7 @@ class StateMachine_Python(StateMachine_Text):
         the_states = sorted([s.name for s in self.states])
         the_events = sorted([e.name for e in self.events])
         the_actions = []
-        classifier_list = []
+        classifier_list = {}
         test_list = []
         the_blocks = [b for b in self.classifiers + self.transitions]
         max_actions = 0
@@ -449,6 +449,7 @@ class StateMachine_Python(StateMachine_Text):
         for idx, action in enumerate(the_actions):
             hdr += ['    %s = %d,' % (action, idx + 1)]
         hdr += ['};', '']
+        hdr += ['extern fsmStateMachine fsm_%s;' % self.name, '']
         hdr += ['#endif /* %s_H */' % uname]
 
         txt = ['#include "%s.h"' % self.name]
@@ -477,6 +478,9 @@ class StateMachine_Python(StateMachine_Text):
                                 act_typ = 'fsmActionTrans'
                             else:
                                 act_typ = 'fsmActionClass'
+                                for action in block.actions:
+                                    if action not in classifier_list:
+                                        classifier_list[action] = block.targets[0]
                             line = '    {%s, %s, %s, %s, %d, %d},' %\
                                     (state, event, target, act_typ, act_idx, act_cnt)
                             line = '%-60s /* %d %s */' % (line, tab_idx, repr(block))
@@ -506,9 +510,9 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['struct fsmActionTab_t {']
         txt += ['    fsmActionFunc *action;']
         txt += ['};', '']
-        txt += ['static fsmActionFunc (*action_funcs[%s_NUM_ACTIONS+1]);' % uname]
+        txt += ['static fsmActionFunc action_funcs[%s_NUM_ACTIONS+1];' % uname]
         txt += ['']
-        txt += ['static fsmStateMachine sm_%s = {' % self.name]
+        txt += ['fsmStateMachine fsm_%s = {' % self.name]
         txt += ['    .name="%s",' % self.name]
         txt += ['    %s_NUM_STATES,' % uname]
         txt += ['    %s_NUM_EVENTS,' % uname]
@@ -523,47 +527,31 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['    trans_table,']
         txt += ['    action_funcs']
         txt += ['};', '']
-        txt += ['int trans_fn(int state, int event) {']
-        txt += ['    int i;']
-        txt += ['    for (i = map_table[state]; i < map_table[state + 1]; ++i) {']
-        txt += ['        if (trans_table[i].ei == event)']
-        txt += ['            return i;']
-        txt += ['    }']
-        txt += ['    return -1;']
-        txt += ['}', '']
-        txt += ['void print_tfr(int j) {']
-        txt += ['    int k;']
-        txt += ['    printf("%s(%s)", state_names[trans_table[j].si], event_names[trans_table[j].ei]);']
-        txt += ['    for (k = 0; k < trans_table[j].ac_count; ++k) {']
-        txt += ['        int act = trans_table[j].ac_start + k;']
-        txt += ['        char *action = action_names[action_table[act]];']
-        txt += ['        printf("%s%s", k == 0 ? ": " : ", ", action);']
-        txt += ['    }']
-        txt += ['    if (trans_table[j].so) {']
-        txt += ['        printf(" => %s", state_names[trans_table[j].so]);']
-        txt += ['    }']
-        txt += ['    printf("\\n");']
-        txt += ['}']
-        txt += ['']
-        txt += ['int main(int argc, char *argv[]) {']
-        txt += ['    int i, j, k;']
-        txt += ['    fsmInstance sm = fsmMakeInstance(sm_%s, %s);' % (self.name, 'XX')]
-        txt += ['    for (i = 0; i < %s_NUM_STATES; ++i) {' % uname]
-        txt += ['        int state = i + 1;']
-        txt += ['        printf("STATE: %s\\n", state_names[state]);']
-        txt += ['        for (j = map_table[state]; j < map_table[state + 1]; ++j) {']
-        txt += ['            print_tfr(j);']
-        txt += ['        }']
-        txt += ['    }']
-        txt += ['    for (i = 0; i < %s_NUM_STATES; ++i) {' % uname]
-        txt += ['        for (j = 0; j < %s_NUM_EVENTS; ++j) {' % uname]
-        txt += ['            k = trans_fn(i, j);']
-        txt += ['            if (k > 0) {']
-        txt += ['                print_tfr(k);']
-        txt += ['            }']
-        txt += ['        }']
-        txt += ['    }']
-        txt += ['}']
+        for action in the_actions:
+            txt += ['static int %s_test(fsmInstance *smi, fsmState state, fsmEvent event) {' %action]
+            if action in classifier_list:
+                next_event = classifier_list[action][0]
+                txt += ['    printf("Action: %-20s, State: %%-20s, Event: %%-20s, NextEvent: %s\\n", smi->fsm->stateNames[state], smi->fsm->eventNames[event]);' % (action, next_event)]
+                txt += ['    return %s;' % next_event]
+            else:
+                txt += ['    printf("Action: %-20s, State: %%-20s, Event: %%-20s\\n", smi->fsm->stateNames[state], smi->fsm->eventNames[event]);' % action]
+                txt += ['    return 0;']
+            txt += ['}', '']
+        txt += ['void register_%s_actions(void) {' % (self.name)]
+        txt += ['    fsmStateMachine *fsm = &fsm_%s;' % (self.name)]
+        for action in the_actions:
+            txt += ['    fsmSetActionFunction(fsm, %s, %s_test);' % (action, action)]
+        txt += ['};', '']
+        txt += ['void test_%s_actions(void) {' % (self.name)]
+        txt += ['    fsmStateMachine *fsm = &fsm_%s;' % (self.name)]
+        txt += ['    fsmInstance smi = { .name="test", .fsm=fsm };']
+        txt += ['', '    register_%s_actions();' % (self.name), '']
+        for block in the_blocks:
+            txt += ['    smi.currentState = %s;' % block.source]
+            txt += ['    printf("%s -> %s\\n");' %(block.event, block.source)]
+            txt += ['    fsmRunStateMachine(&smi, %s);' % block.event]
+            txt += ['    printf("=> %s\\n", fsm->stateNames[smi.currentState]);']
+        txt += ['};', '']
         return (hdr, txt)
 
 if __name__ == "__main__":
