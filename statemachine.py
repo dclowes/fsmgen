@@ -458,7 +458,9 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['']
         tab_idx = 0
         act_idx = 0
+        evt_idx = 0
         act_txt = ['static int action_table[] = {']
+        evt_txt = ['static int event_table[] = {']
         map_txt = ['static int map_table[] = {', '    0,']
         tab_txt = ['static fsmTransTab trans_table[] = {']
         for state in the_states:
@@ -476,22 +478,33 @@ class StateMachine_Python(StateMachine_Text):
                                 act_txt += ['    %s,' % actions]
                             if isinstance(block, Transition):
                                 act_typ = 'fsmActionTrans'
+                                act_typ += ', .so=%s' % target
+                                act_typ += ', .ac_start=%d' % act_idx
+                                act_typ += ', .ac_count=%d' % act_cnt
                             else:
+                                evt_cnt = len(block.targets)
+                                if evt_cnt > 0:
+                                    evt_txt += ['    %s,' % ', '.join([b[0] for b in block.targets])]
                                 act_typ = 'fsmActionClass'
+                                act_typ += ', .ac_class=%s' % block.actions[0]
+                                act_typ += ', .ev_start=%d' % evt_idx
+                                evt_idx += evt_cnt
+                                act_typ += ', .ev_count=%s' % evt_cnt
                                 for action in block.actions:
                                     if action not in classifier_list:
                                         classifier_list[action] = block.targets[0]
-                            line = '    {%s, %s, %s, %s, %d, %d},' %\
-                                    (state, event, target, act_typ, act_idx, act_cnt)
+                            line = '    {.si=%s, .ei=%s, .ac_type=%s},' % (state, event, act_typ)
                             line = '%-60s /* %d %s */' % (line, tab_idx, repr(block))
                             tab_txt += [line]
-                            act_idx += act_cnt
                             tab_idx += 1
+                            act_idx += act_cnt
         act_txt += ['};', '']
+        evt_txt += ['};', '']
         map_txt += ['    %d' % tab_idx]
         map_txt += ['};', '']
         tab_txt += ['};', '']
         txt += act_txt
+        txt += evt_txt
         txt += map_txt
         txt += tab_txt
         txt += ['']
@@ -514,18 +527,19 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['']
         txt += ['fsmStateMachine fsm_%s = {' % self.name]
         txt += ['    .name="%s",' % self.name]
-        txt += ['    %s_NUM_STATES,' % uname]
-        txt += ['    %s_NUM_EVENTS,' % uname]
-        txt += ['    %s_NUM_TRANS,' % uname]
-        txt += ['    %s_NUM_ACTIONS,' % uname]
-        txt += ['    %s_MAX_ACTIONS,' % uname]
-        txt += ['    map_table,']
-        txt += ['    action_table,']
-        txt += ['    state_names,']
-        txt += ['    event_names,']
-        txt += ['    action_names,']
-        txt += ['    trans_table,']
-        txt += ['    action_funcs']
+        txt += ['    .numStates=%s_NUM_STATES,' % uname]
+        txt += ['    .numEvents=%s_NUM_EVENTS,' % uname]
+        txt += ['    .numTrans=%s_NUM_TRANS,' % uname]
+        txt += ['    .numActions=%s_NUM_ACTIONS,' % uname]
+        txt += ['    .maxActions=%s_MAX_ACTIONS,' % uname]
+        txt += ['    .mapTab=map_table,']
+        txt += ['    .actTab=action_table,']
+        txt += ['    .evtTab=event_table,']
+        txt += ['    .stateNames=state_names,']
+        txt += ['    .eventNames=event_names,']
+        txt += ['    .actionNames=action_names,']
+        txt += ['    .transTab=trans_table,']
+        txt += ['    .actionTab=action_funcs']
         txt += ['};', '']
         for action in the_actions:
             txt += ['static int %s_test(fsmInstance *smi, fsmState state, fsmEvent event) {' %action]

@@ -16,10 +16,19 @@ typedef fsmActionFunc **fsmActionTab;
 struct fsmTransTab_t {
     fsmState si;
     fsmEvent ei;
-    fsmState so;
     fsmActionType ac_type;
-    int ac_start;
-    int ac_count;
+    union {
+        struct {
+            fsmState so;
+            int ac_start;
+            int ac_count;
+        };
+        struct {
+            int ac_class;
+            int ev_start;
+            int ev_count;
+        };
+    };
 };
 
 /*
@@ -36,6 +45,7 @@ struct fsmStateMachine_t {
     int maxActions;
     int *mapTab;
     int *actTab;
+    int *evtTab;
     char **stateNames;
     char **eventNames;
     char **actionNames;

@@ -67,15 +67,25 @@ void fsmPrintStateMachine(fsmStateMachine *fsm) {
 
     printf("\n  Transitions:\n");
     for (i = 0; i < fsm->numTrans; ++i) {
-        printf("    %-*s(%-*s)", slen, fsm->stateNames[fsm->transTab[i].si],
-                elen, fsm->eventNames[fsm->transTab[i].ei]);
-            for (j = 0; j < fsm->transTab[i].ac_count; ++j) {
-                int act = fsm->transTab[i].ac_start + j;
+        fsmTransTab *tab = &fsm->transTab[i];
+        printf("    %-*s(%-*s)", slen, fsm->stateNames[tab->si],
+                elen, fsm->eventNames[tab->ei]);
+        if (tab->ac_type == fsmActionClass) {
+            printf(": %s", fsm->actionNames[tab->ac_class]);
+            for (j = 0; j < tab->ev_count; ++j) {
+                int evt = tab->ev_start + j;
+                char *event = fsm->eventNames[fsm->evtTab[evt]];
+                printf("%s%-*s", j == 0 ? " => " : ", ", alen, event);
+            }
+        } else {
+            for (j = 0; j < tab->ac_count; ++j) {
+                int act = tab->ac_start + j;
                 char *action = fsm->actionNames[fsm->actTab[act]];
                 printf("%s%-*s", j == 0 ? ": " : ", ", alen, action);
             }
-        if (fsm->transTab[i].so) {
-            printf(" => %s", fsm->stateNames[fsm->transTab[i].so]);
+            if (tab->so) {
+                printf(" => %s", fsm->stateNames[tab->so]);
+            }
         }
         printf("\n");
     }
@@ -86,29 +96,33 @@ int fsmRunStateMachine(fsmInstance *smi, fsmEvent ev) {
     fsmEvent next_event = 0;
     fsmState next_state = smi->currentState;
     fsmStateMachine *fsm = smi->fsm;
+    int s_beg = fsm->mapTab[smi->currentState];
+    int s_end = fsm->mapTab[smi->currentState + 1];
     do {
         next_event = 0;
         if (ev < 1 || ev > fsm->numEvents) {
             return -1;
         }
-        for (i = fsm->mapTab[smi->currentState]; i < fsm->mapTab[smi->currentState + 1]; ++i) {
+        for (i = s_beg; i < s_end; ++i) {
             if (fsm->transTab[i].ei == ev) {
                 fsmTransTab *tab = &fsm->transTab[i];
                 fsmActionType actionType = tab->ac_type;
-                if (tab->so)
-                    next_state = tab->so;
-                for (j = 0; j < tab->ac_count; ++ j) {
-                    int k = fsm->actTab[tab->ac_start + j];
-                    fsmActionFunc fn = fsm->actionTab[k];
-                    switch (actionType) {
-                        case fsmActionClass:
-                            next_event = (*fn)(smi, smi->currentState, ev);
-                            ev = next_event;
-                            break;
-                        case fsmActionTrans:
+                fsmActionFunc fn;
+                switch (actionType) {
+                    case fsmActionClass:
+                        fn = fsm->actionTab[tab->ac_class];
+                        next_event = (*fn)(smi, smi->currentState, ev);
+                        ev = next_event;
+                        break;
+                    case fsmActionTrans:
+                        if (tab->so)
+                            next_state = tab->so;
+                        for (j = 0; j < tab->ac_count; ++ j) {
+                            int k = fsm->actTab[tab->ac_start + j];
+                            fn = fsm->actionTab[k];
                             (void) (*fn)(smi, smi->currentState, ev);
-                            break;
-                    }
+                        }
+                        break;
                 }
                 break;
             }
