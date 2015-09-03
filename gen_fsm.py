@@ -455,7 +455,9 @@ precedence = (
 # The head token - it all reduces to this
 #
 def p_fsm(p):
-    'fsm : STATEMACHINE id_or_str fsm_block'
+    '''
+    fsm : STATEMACHINE id_or_str fsm_block
+    '''
     p[0] = [{'Statemachine' : {p[2] : p[3]}}]
     if Verbose:
         print "Statemachine:", p[0]
@@ -464,8 +466,14 @@ def p_fsm(p):
     Statemachines.append(new_sm)
 
 def p_fsm_block(p):
-    'fsm_block : LBRACE fsm_statement_list RBRACE'
-    p[0] = p[2]
+    '''
+    fsm_block : LBRACE fsm_statement_list RBRACE
+              | EQUALS LBRACE fsm_statement_list RBRACE
+    '''
+    if len(p) > 4: # it has the EQUALS in there
+        p[0] = p[3]
+    else:
+        p[0] = p[2]
 
 def p_fsm_statement_list(p):
     '''fsm_statement_list : fsm_statement
@@ -531,11 +539,16 @@ def p_event_type(p):
 
 def p_state_block(p):
     '''
-    state_block : id_or_str EQUALS LBRACE state_code_list RBRACE
+    state_block : id_or_str LBRACE state_code_list RBRACE
+                | id_or_str EQUALS LBRACE state_code_list RBRACE
     '''
     ReportP(p, "state_block")
-    Statemachine['Blocks'][p[1]] = p[4]
-    p[0] = [p[1]] + p[4]
+    if len(p) > 5: # it has the EQUALS in there
+        Statemachine['Blocks'][p[1]] = p[4]
+        p[0] = [p[1]] + p[4]
+    else:
+        Statemachine['Blocks'][p[1]] = p[3]
+        p[0] = [p[1]] + p[3]
 
 def p_state_code_list(p):
     '''
@@ -597,10 +610,15 @@ def p_id_list(p):
 #
 def p_code(p):
     '''
-    code : code_type id_or_str EQUALS LBRACE code_block RBRACE
+    code : code_type id_or_str LBRACE code_block RBRACE
+         | code_type id_or_str EQUALS LBRACE code_block RBRACE
     '''
-    Statemachine['Code'][p[2]] = {'name' : p[2], 'type' : p[1], 'text' : p[5]}
-    p[0] = {'Code' : {'name' : p[2], 'type' : p[1], 'text' : p[5]}}
+    if len(p) > 5: # it has the EQUALS in there
+        Statemachine['Code'][p[2]] = {'name' : p[2], 'type' : p[1], 'text' : p[5]}
+        p[0] = {'Code' : {'name' : p[2], 'type' : p[1], 'text' : p[5]}}
+    else:
+        Statemachine['Code'][p[2]] = {'name' : p[2], 'type' : p[1], 'text' : p[4]}
+        p[0] = {'Code' : {'name' : p[2], 'type' : p[1], 'text' : p[4]}}
 
 def p_code_type(p):
     '''
