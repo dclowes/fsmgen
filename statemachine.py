@@ -255,7 +255,7 @@ class StateMachine_Text(StateMachine):
         txt += ['  STATES\n    %s;' % ',\n    '.join(the_states)]
         txt += ['  EVENTS\n    %s;' % ',\n    '.join(the_events)]
         for state in the_states:
-            txt += ['  State %s = {' % state]
+            txt += ['  State %s {' % state]
             the_blocks = [b for b in self.classifiers if b.source == state]
             the_blocks += [b for b in self.transitions if b.source == state]
             for block in the_blocks:
@@ -272,8 +272,8 @@ class StateMachine_Text(StateMachine):
                         line += ' => %s' % ', '.join(block.targets)
                 txt += ['    %s;' % line]
             txt += ['  }']
-        for action in self.actions:
-            txt += ['  CODE %s %s = {' % (action.code_type, action.name)]
+        for action in sorted(self.actions, key=lambda action: action.name.lower()):
+            txt += ['  CODE %s %s {' % (action.code_type, action.name)]
             txt += ['    @TCL']
             for line in action.code_text[1]:
                 txt += [line]
@@ -463,13 +463,15 @@ class StateMachine_Python(StateMachine_Text):
         evt_txt = ['static int event_table[] = {']
         map_txt = ['static int map_table[] = {', '    0,']
         tab_txt = ['static fsmTransTab trans_table[] = {']
+        slen = max([len(s) for s in the_states])
+        elen = max([len(e) for e in the_events])
         for state in the_states:
             map_txt += ['    %d, /* %s */' % (tab_idx, state)]
             for event in the_events:
                 for block in the_blocks:
                     if block.source == state:
                         if block.event == event:
-                            actions = ','.join(block.actions)
+                            actions = ', '.join(block.actions)
                             act_cnt = len(block.actions)
                             target = "0"
                             if isinstance(block, Transition) and len(block.targets) > 0:
@@ -493,8 +495,11 @@ class StateMachine_Python(StateMachine_Text):
                                 for action in block.actions:
                                     if action not in classifier_list:
                                         classifier_list[action] = block.targets[0]
-                            line = '    {.si=%s, .ei=%s, .ac_type=%s},' % (state, event, act_typ)
-                            line = '%-60s /* %d %s */' % (line, tab_idx, repr(block))
+                            line = '    {.si=%-*s, .ei=%-*s, .ac_type=%s},' % (slen, state, elen, event, act_typ)
+                            if False:
+                                line = '%s /* %d %s */' % (line, tab_idx, repr(block))
+                            else:
+                                line = '%s /* %d */' % (line, tab_idx)
                             tab_txt += [line]
                             tab_idx += 1
                             act_idx += act_cnt

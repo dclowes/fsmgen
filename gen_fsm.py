@@ -613,7 +613,7 @@ def p_code(p):
     code : code_type id_or_str LBRACE code_block RBRACE
          | code_type id_or_str EQUALS LBRACE code_block RBRACE
     '''
-    if len(p) > 5: # it has the EQUALS in there
+    if len(p) > 6: # it has the EQUALS in there
         Statemachine['Code'][p[2]] = {'name' : p[2], 'type' : p[1], 'text' : p[5]}
         p[0] = {'Code' : {'name' : p[2], 'type' : p[1], 'text' : p[5]}}
     else:
@@ -688,6 +688,7 @@ def load_file(source_file, depth_list):
     return LocalData
 
 def process_source(source_file):
+    from xml.sax.saxutils import escape
     global Statemachine
     Statemachine = {}
     Statemachine['Filename'] = source_file
@@ -726,30 +727,31 @@ def process_source(source_file):
     text.write('<TABLE BORDER=8 ALIGN="center">\n')
 
     text.write('<TR><TD ALIGN="left">\n')
-    text.write('<TABLE BORDER=0 ALIGN="center">\n')
-    text.write('<TR><TD ALIGN="left">\n')
+    text.write('<TABLE BORDER=1 ALIGN="center">\n')
+    text.write('<TR><TH ALIGN="center">What you wrote</TH><TH ALIGN="center">What I saw</TH></TR>\n')
+    text.write('<TR><TD ALIGN="left" VALIGN="top">\n')
     text.write('<PRE>\n' + '\n'.join(SourceData) + '\n</PRE>\n')
     text.write('</TD><TD ALIGN="left">\n')
     text.write('<PRE>\n' + '\n'.join(new_sm.TextStateMachine()) + '\n</PRE>\n')
     text.write('</TD></TR></TABLE>\n')
     text.write('</TD></TR>\n')
 
-    text.write('<TR><TD ALIGN="center">State Table 1<BR/>\n')
+    text.write('<TR><TD ALIGN="center">State Table 1 - State by State<BR/>\n')
     txt = new_sm.StateTable1()
     text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
 
-    text.write('<TR><TD ALIGN="center">State Table 2<BR/>\n')
+    text.write('<TR><TD ALIGN="center">State Table 2 - State by Event<BR/>\n')
     txt = new_sm.StateTable2()
     text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
 
-    text.write('<TR><TD ALIGN="center">State Table 3<BR/>\n')
+    text.write('<TR><TD ALIGN="center">State Table 3 - Tabular<BR/>\n')
     txt = new_sm.StateTable3()
     text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
 
-    text.write('<TR><TD ALIGN="left">\n')
+    text.write('<TR><TD ALIGN="left">in Python<BR/>\n')
     txt = new_sm.Generate_Python()
     with open('%s.new.py' % source_file, 'w') as fdo:
         fdo.write('\n'.join(txt))
@@ -759,7 +761,7 @@ def process_source(source_file):
     text.write('<PRE>' + '\n'.join(txt) + '</PRE>')
     text.write('</TD></TR>\n')
 
-    text.write('<TR><TD ALIGN="left">\n')
+    text.write('<TR><TD ALIGN="left">in TCL<BR/>\n')
     txt = new_sm.Generate_TCL()
     with open('%s.new.tcl' % source_file, 'w') as fdo:
         fdo.write('\n'.join(txt))
@@ -774,18 +776,18 @@ def process_source(source_file):
         fdo.write('\n'.join(hdr))
     with open('%s.c' % new_sm.name, 'w') as fdo:
         fdo.write('\n'.join(txt))
-    text.write('<TR><TD ALIGN="left">\n')
-    text.write('<PRE>' + '\n'.join(hdr) + '</PRE>')
+    text.write('<TR><TD ALIGN="left">C Header file<BR/>\n')
+    text.write('<PRE>' + escape('\n'.join(hdr)) + '</PRE>')
     text.write('</TD></TR>\n')
-    text.write('<TR><TD ALIGN="left">\n')
-    text.write('<PRE>' + '\n'.join(txt) + '</PRE>')
+    text.write('<TR><TD ALIGN="left">C Code file\n')
+    text.write('<PRE>' + escape('\n'.join(txt)) + '</PRE>')
     text.write('</TD></TR>\n')
 
-    text.write('<TR><TD ALIGN="center">State Diagram New 1<BR/>\n')
+    text.write('<TR><TD ALIGN="center">New State Diagram<BR/>\n')
     text.write('<img src="%s.new.svg" alt="%s.new.svg"/>\n' % (source_file, source_file))
     text.write('</TD></TR>\n')
 
-    text.write('<TR><TD ALIGN="center">State Diagram 1<BR/>\n')
+    text.write('<TR><TD ALIGN="center">Old State Diagram<BR/>\n')
     text.write('<img src="%s.svg" alt="%s.svg"/>\n' % (source_file, source_file))
     text.write('</TD></TR>\n')
 
