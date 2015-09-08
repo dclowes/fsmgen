@@ -91,8 +91,8 @@ void fsmPrintStateMachine(fsmStateMachine *fsm) {
     }
 }
 
-int fsmRunStateMachine(fsmInstance *smi, fsmEvent ev) {
-    int i, j;
+int fsmRunStateEvent(fsmInstance *smi, fsmEvent ev) {
+    int i, j, k;
     fsmEvent next_event = 0;
     fsmState next_state = smi->currentState;
     fsmStateMachine *fsm = smi->fsm;
@@ -110,7 +110,10 @@ int fsmRunStateMachine(fsmInstance *smi, fsmEvent ev) {
                 fsmActionFunc fn;
                 switch (actionType) {
                     case fsmActionClass:
-                        fn = fsm->actionTab[tab->ac_class];
+                        k = tab->ac_class;
+                        fn = fsm->actionTab[k];
+                        if (smi->actionTab && smi->actionTab[k])
+                            fn = smi->actionTab[k];
                         next_event = (*fn)(smi, smi->currentState, ev);
                         ev = next_event;
                         break;
@@ -118,8 +121,10 @@ int fsmRunStateMachine(fsmInstance *smi, fsmEvent ev) {
                         if (tab->so)
                             next_state = tab->so;
                         for (j = 0; j < tab->ac_count; ++ j) {
-                            int k = fsm->actTab[tab->ac_start + j];
+                            k = fsm->actTab[tab->ac_start + j];
                             fn = fsm->actionTab[k];
+                            if (smi->actionTab && smi->actionTab[k])
+                                fn = smi->actionTab[k];
                             (void) (*fn)(smi, smi->currentState, ev);
                         }
                         break;
@@ -128,10 +133,20 @@ int fsmRunStateMachine(fsmInstance *smi, fsmEvent ev) {
             }
         }
     } while (next_event > 0);
-    smi->currentState = next_state;
     return 0;
 }
 
+int fsmRunStateMachine(fsmInstance *smi, fsmEvent ev) {
+    fsmState next_state = fsmRunStateEvent(smi, ev);
+    if (next_state != smi->currentState) {
+        if (smi->fsm->exitEvent)
+            fsmRunStateEvent(smi, smi->fsm->exitEvent);
+        smi->currentState = next_state;
+        if (smi->fsm->entryEvent)
+            fsmRunStateEvent(smi, smi->fsm->entryEvent);
+    }
+    return 0;
+}
 void fsmSetActionFunction(fsmStateMachine *t, fsmAction action, fsmActionFunc func) {
     if (action > 0 && action <= t->numActions)
         t->actionTab[action] = func;

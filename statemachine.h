@@ -43,6 +43,8 @@ struct fsmStateMachine_t {
     int numTrans;
     int numActions;
     int maxActions;
+    int entryEvent;
+    int exitEvent;
     int *mapTab;
     int *actTab;
     int *evtTab;
@@ -60,6 +62,7 @@ struct fsmStateMachine_t {
 struct fsmInstance_t {
     char *name;
     fsmStateMachine *fsm;
+    fsmActionFunc *actionTab;
     int currentState;
     void *priv; /* private */
     void (*killPriv)(void*);
