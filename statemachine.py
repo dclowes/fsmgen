@@ -273,11 +273,13 @@ class StateMachine_Text(StateMachine):
                 txt += ['    %s;' % line]
             txt += ['  }']
         for action in sorted(self.actions, key=lambda action: action.name.lower()):
+            print "##Action:", action
             txt += ['  CODE %s %s {' % (action.code_type, action.name)]
-            txt += ['    @TCL']
-            for line in action.code_text[1]:
-                txt += [line]
-            txt += ['    @END']
+            for action_item in action.code_text:
+                txt += ['    @%s' % action_item[0]]
+                for line in action_item[1]:
+                    txt += [line]
+                txt += ['    @END']
             txt += ['  }']
         txt += ['}']
         return txt
@@ -340,6 +342,22 @@ class StateMachine_Python(StateMachine_Text):
             ev = test[1]
             s2 = test[2]
             txt += ['    assert %s("%s", "%s")[0] == "%s"' % (func_name, s1, ev, s2)]
+        txt += ['else:']
+        for action in action_list:
+            the_blocks = [b for b in self.actions if b.name == action and b.code_type == 'action']
+            if len(the_blocks) == 0:
+                continue
+            txt += ['    def %s (state, event):' % action]
+            print "##The Blocks:", the_blocks
+            for code_block in the_blocks:
+                print "##CodeBlock:", code_block
+                print "##CodeText:", code_block.code_text
+                for code_text in [c[1] for c in code_block.code_text if c[0] == 'PYTHON']:
+                    print "##CodeText:", code_text
+                    min_wh = min([len(s) - len(s.lstrip(' ')) for s in code_text])
+                    for code in code_text:
+                        print "##Code:", code[min_wh:]
+                        txt += ['        ' + code[min_wh:]]
         return txt
 
     def Generate_TCL(self):
@@ -349,7 +367,7 @@ class StateMachine_Python(StateMachine_Text):
         classifier_list = []
         test_list = []
         func_name = 'StateSwitch_%s'  % self.name
-        txt = ['proc %s {state event} {' % func_name]
+        txt = ['proc %s {context state event} {' % func_name]
         txt += ['    set next_state ${state}']
         txt += ['    set next_event {}']
         for s in the_states:
@@ -361,11 +379,11 @@ class StateMachine_Python(StateMachine_Text):
                         txt += ['        if {${event} == "%s"} {' % e]
                         for action in block.actions:
                             if isinstance(block, Classifier):
-                                txt += ['            set next_event [%s ${state} ${event}]' % (action)]
+                                txt += ['            set next_event [%s ${context} ${state} ${event}]' % (action)]
                                 if action not in [c[0] for c in classifier_list]:
                                     classifier_list.append((action, block.targets))
                             else:
-                                txt += ['            %s ${state} ${event}' % (action)]
+                                txt += ['            %s ${context} ${state} ${event}' % (action)]
                                 if action not in action_list:
                                     action_list.append(action)
                         if isinstance(block, Transition) and len(block.targets) > 0:
@@ -378,7 +396,21 @@ class StateMachine_Python(StateMachine_Text):
             txt += ['        return [list ${next_state} ${next_event}]']
             txt += ['    }']
         txt += ['    return [list ${next_state} ${next_event}]']
-        txt += ['}']
+        txt += ['}', '']
+        txt += ['proc RunStateSwitch_%s {context state event} {' % self.name]
+        txt += ['    set next_state ${state}']
+        txt += ['    set next_event ${event}']
+        txt += ['    while { ${next_event} != {} } {']
+        txt += ['        set state_event [StateSwitch_%s ${context} ${state} ${next_event}]' % self.name]
+        txt += ['        set next_event [lindex ${state_event} 1]']
+        txt += ['    }']
+        txt += ['    set next_state [lindex ${state_event} 0]']
+        txt += ['    if { ${next_state} != ${state} } {']
+        txt += ['        StateSwitch_%s ${context} ${state} "Exit"' % self.name]
+        txt += ['        StateSwitch_%s ${context} ${next_state} "Entry"' % self.name]
+        txt += ['    }']
+        txt += ['    return [list ${next_state} ${next_event}]']
+        txt += ['}', '']
         slen = max([len(s) for s in the_states])
         elen = max([len(e) for e in the_events])
         txt += ['if { "[lindex [split [info nameofexecutable] "/"] end]" == "tclsh"} {']
@@ -406,10 +438,20 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['} else {']
         for action in action_list:
             the_blocks = [b for b in self.actions if b.name == action and b.code_type == 'action']
-            for code in [c.code_text[1] for c in the_blocks if c.code_text[0] == 'TCL']:
-                txt += ['    proc %s {state event} {' % action]
-                txt += ['        ' + l for l in code]
-                txt += ['    }']
+            if len(the_blocks) == 0:
+                continue
+            txt += ['    proc %s {state event} {' % action]
+            print "##The Blocks:", the_blocks
+            for code_block in the_blocks:
+                print "##CodeBlock:", code_block
+                print "##CodeText:", code_block.code_text
+                for code_text in [c[1] for c in code_block.code_text if c[0] == 'TCL']:
+                    print "##CodeText:", code_text
+                    min_wh = min([len(s) - len(s.lstrip(' ')) for s in code_text])
+                    for code in code_text:
+                        print "##Code:", code[min_wh:]
+                        txt += ['        ' + code[min_wh:]]
+            txt += ['    }']
         txt += ['}']
         return txt
 
@@ -537,6 +579,10 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['    .numTrans=%s_NUM_TRANS,' % uname]
         txt += ['    .numActions=%s_NUM_ACTIONS,' % uname]
         txt += ['    .maxActions=%s_MAX_ACTIONS,' % uname]
+        if 'Entry' in the_events:
+            txt += ['    .entryEvent=Entry,']
+        if 'Exit' in the_events:
+            txt += ['    .exitEvent=Exit,']
         txt += ['    .mapTab=map_table,']
         txt += ['    .actTab=action_table,']
         txt += ['    .evtTab=event_table,']
