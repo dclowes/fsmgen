@@ -308,6 +308,8 @@ tokens = [
     'TEXT_STRING2',
     'EQUALS',
     'ID',
+    'AT_C',
+    'AT_PYTHON',
     'AT_TCL',
     'AT_END',
     'DISPATCH',
@@ -327,6 +329,22 @@ t_RBRACE = r'}'
 t_SLASH = r'/'
 t_COMMA = r','
 t_COLON = r':'
+
+def t_AT_C(t):
+    r'@C'
+    if Verbose:
+        print 'AT_C'
+    t.lexer.begin('tcl')
+    t.value = "@C"
+    return t
+
+def t_AT_PYTHON(t):
+    r'@PYTHON'
+    if Verbose:
+        print 'AT_PYTHON'
+    t.lexer.begin('tcl')
+    t.value = "@PYTHON"
+    return t
 
 def t_AT_TCL(t):
     r'@TCL'
@@ -628,14 +646,34 @@ def p_code_type(p):
 
 def p_code_block(p):
     '''
-    code_block : tcl_code_block
+    code_block : empty
+               | code_block c_code_block
+               | code_block python_code_block
+               | code_block tcl_code_block
     '''
     ReportP(p, "code_block")
-    p[0] = p[1]
+    if len(p) == 2:
+        p[0] = []
+    else:
+        p[0] = p[1] + [p[2]]
+
+def p_c_code_block(p):
+    '''
+    tcl_code_block : AT_C code_list AT_END
+    '''
+    ReportP(p, "tcl_code_block")
+    p[0] = ['C', p[2]]
+
+def p_python_code_block(p):
+    '''
+    c_code_block : AT_PYTHON code_list AT_END
+    '''
+    ReportP(p, "tcl_code_block")
+    p[0] = ['PYTHON', p[2]]
 
 def p_tcl_code_block(p):
     '''
-    tcl_code_block : AT_TCL code_list AT_END
+    python_code_block : AT_TCL code_list AT_END
     '''
     ReportP(p, "tcl_code_block")
     p[0] = ['TCL', p[2]]
@@ -721,11 +759,17 @@ def process_source(source_file):
     print dot_cmd
     os.system(dot_cmd)
 
+    TABLE_START = '<TABLE BORDER=0 ALIGN="center">\n'
+    TABLE_END = '</TABLE>\n'
+    HDR_FMT = '<P style="page-break-before: always" ALIGN="center">%s</P>\n'
+
     text = open("%s.html" % source_file, "w")
     text.write('<HTML>\n')
     text.write('<TITLE>Finite State Machine %s</TITLE>\n' % source_file)
-    text.write('<TABLE BORDER=8 ALIGN="center">\n')
 
+    text.write('<P ALIGN="center">%s</P>\n' % 'Source Code')
+
+    text.write(TABLE_START)
     text.write('<TR><TD ALIGN="left">\n')
     text.write('<TABLE BORDER=1 ALIGN="center">\n')
     text.write('<TR><TH ALIGN="center">What you wrote</TH><TH ALIGN="center">What I saw</TH></TR>\n')
@@ -736,58 +780,68 @@ def process_source(source_file):
     text.write('</TD></TR></TABLE>\n')
     text.write('</TD></TR>\n')
 
-    text.write('<TR><TD ALIGN="center">State Table 1 - State by State<BR/>\n')
+    text.write(TABLE_END + HDR_FMT % 'New State Diagram' + TABLE_START)
+
+    text.write('<TR><TD ALIGN="center">\n')
+    text.write('<img src="%s.new.svg" alt="%s.new.svg"/>\n' % (source_file, source_file))
+    text.write('</TD></TR>\n')
+
+    text.write(TABLE_END + HDR_FMT % 'State Table 1' + TABLE_START)
+
+    text.write('<TR><TD ALIGN="center">\n')
     txt = new_sm.StateTable1()
     text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
 
-    text.write('<TR><TD ALIGN="center">State Table 2 - State by Event<BR/>\n')
+    text.write(TABLE_END + HDR_FMT % 'State Table 2' + TABLE_START)
+
+    text.write('<TR><TD ALIGN="center">\n')
     txt = new_sm.StateTable2()
     text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
 
-    text.write('<TR><TD ALIGN="center">State Table 3 - Tabular<BR/>\n')
+    text.write(TABLE_END + HDR_FMT % 'State Table 3' + TABLE_START)
+
+    text.write('<TR><TD ALIGN="center">\n')
     txt = new_sm.StateTable3()
     text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
 
-    text.write('<TR><TD ALIGN="left">in Python<BR/>\n')
+    text.write(TABLE_END + HDR_FMT % 'in Python' + TABLE_START)
+
+    text.write('<TR><TD ALIGN="left">\n')
     txt = new_sm.Generate_Python()
-    with open('%s.new.py' % source_file, 'w') as fdo:
-        fdo.write('\n'.join(txt))
-    txt = Generate_Python(Statemachine)
     with open('%s.py' % source_file, 'w') as fdo:
         fdo.write('\n'.join(txt))
     text.write('<PRE>' + '\n'.join(txt) + '</PRE>')
     text.write('</TD></TR>\n')
 
-    text.write('<TR><TD ALIGN="left">in TCL<BR/>\n')
+    text.write(TABLE_END + HDR_FMT % 'in TCL' + TABLE_START)
+
+    text.write('<TR><TD ALIGN="left">\n')
     txt = new_sm.Generate_TCL()
-    with open('%s.new.tcl' % source_file, 'w') as fdo:
-        fdo.write('\n'.join(txt))
-    txt = Generate_TCL(Statemachine)
     with open('%s.tcl' % source_file, 'w') as fdo:
         fdo.write('\n'.join(txt))
     text.write('<PRE>' + '\n'.join(txt) + '</PRE>')
     text.write('</TD></TR>\n')
+
+    text.write(TABLE_END + HDR_FMT % 'in C' + TABLE_START)
 
     hdr, txt = new_sm.Generate_C()
     with open('%s.h' % new_sm.name, 'w') as fdo:
         fdo.write('\n'.join(hdr))
     with open('%s.c' % new_sm.name, 'w') as fdo:
         fdo.write('\n'.join(txt))
-    text.write('<TR><TD ALIGN="left">C Header file<BR/>\n')
+    text.write('<TR><TD ALIGN="left">\n')
     text.write('<PRE>' + escape('\n'.join(hdr)) + '</PRE>')
     text.write('</TD></TR>\n')
     text.write('<TR><TD ALIGN="left">C Code file\n')
     text.write('<PRE>' + escape('\n'.join(txt)) + '</PRE>')
     text.write('</TD></TR>\n')
 
-    text.write('<TR><TD ALIGN="center">New State Diagram<BR/>\n')
-    text.write('<img src="%s.new.svg" alt="%s.new.svg"/>\n' % (source_file, source_file))
-    text.write('</TD></TR>\n')
+    text.write(TABLE_END + HDR_FMT % 'Old State Diagram' + TABLE_START)
 
-    text.write('<TR><TD ALIGN="center">Old State Diagram<BR/>\n')
+    text.write('<TR><TD ALIGN="center">\n')
     text.write('<img src="%s.svg" alt="%s.svg"/>\n' % (source_file, source_file))
     text.write('</TD></TR>\n')
 
