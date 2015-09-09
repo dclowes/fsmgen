@@ -66,12 +66,20 @@ class Action(object):
     def __repr__(self):
         return "%s(%s) {%s}" % (self.name, self.code_type, self.code_text)
 
+class Test(object):
+    def __init__(self, tests):
+        self.tests = tests
+
+    def __repr__(self):
+        return ", ".join(self.tests)
+
 class StateMachine(object):
     def __init__(self, name):
         self.name = name
         self.actions = []
         self.events = []
         self.states = []
+        self.tests = []
         self.transitions = []
         self.classifiers = []
 
@@ -107,6 +115,14 @@ class StateMachine(object):
         assert isinstance(action, Action)
         self.actions.append(action)
 
+    def addTest(self, test):
+        assert isinstance(test, Test)
+        for item in test.tests:
+            assert item in [s.name for s in self.states] + [e.name for e in self.events]
+        assert test.tests[0] in [s.name for s in self.states]
+        assert test.tests[-1] in [s.name for s in self.states]
+        self.tests.append(test)
+
     def printit(self):
         print "StateMachine:", self.name
         print "States:", ", ".join([repr(s) for s in self.states])
@@ -117,6 +133,8 @@ class StateMachine(object):
             print "Transition:", t
         for a in self.actions:
             print "Action:", a
+        for t in self.tests:
+            print "Test:", t
 
 class StateMachine_Text(StateMachine):
     def __init__(self, other):
@@ -126,6 +144,7 @@ class StateMachine_Text(StateMachine):
             self.actions = other.actions
             self.events = other.events
             self.states = other.states
+            self.tests = other.tests
             self.transitions = other.transitions
             self.classifiers = other.classifiers
 
@@ -284,6 +303,8 @@ class StateMachine_Text(StateMachine):
                     txt += [line]
                 txt += ['    @END']
             txt += ['  }']
+        for test in self.tests:
+            txt += ['  Test %s;' % ',\n    '.join(test.tests)]
         txt += ['}']
         return txt
 
@@ -377,6 +398,16 @@ class StateMachine_Python(StateMachine_Text):
             txt += ['        assert state_event[0] == "%s"' % (s2)]
         txt += ['    TestStateSwitch_%s()' % self.name]
         txt += ['    print "TestStateSwitch_%s() passed"' % self.name]
+        for test in self.tests:
+            print "Test::", test
+            txt += ['    state_event = ("%s", None, 0)' % test.tests[0]]
+            for t in test.tests:
+                if t in the_states:
+                    txt += ['    assert state_event[0] == "%s"' % t]
+                else:
+                    txt += ['    state_event = %s("Context", state_event[0], "%s")' % (func_name, t)]
+                    txt += ['    assert state_event[2] > 0']
+            txt += ['    print "Test Passed: %s"' % repr(test)]
         txt2 = ['else:']
         for action in action_list:
             the_blocks = [b for b in self.actions if b.name == action and b.code_type == 'action']
@@ -475,9 +506,20 @@ class StateMachine_Python(StateMachine_Text):
             s1 = test[0]
             ev = test[1]
             s2 = test[2]
-            txt += ['    set state_event [%s "Context" "%s" "%s"]' % (func_name, s1, ev)]
+            txt += ['    set state_event [%s "Ctx" "%s" "%s"]' % (func_name, s1, ev)]
             txt += ['    if {[lindex ${state_event} 2] <= 0} {error "count fail!"}']
             txt += ['    if {[lindex ${state_event} 0] != "%s"} {error "state fail!"}' % (s2)]
+        txt += ['    puts "TestStateSwitch_%s() passed"' % self.name]
+        for test in self.tests:
+            print "Test::", test
+            txt += ['    set state_event [list "%s" {} 0]' % test.tests[0]]
+            for t in test.tests:
+                if t in the_states:
+                    txt += ['    if {[lindex ${state_event} 0] != "%s"} {error "state fail!"}' % t]
+                else:
+                    txt += ['    set state_event [%s "Ctx" [lindex ${state_event} 0] "%s"]' % (func_name, t)]
+                    txt += ['    if {[lindex ${state_event} 2] <= 0} {error "count fail!"}']
+            txt += ['    puts "Test Passed: %s"' % repr(test)]
         txt2 = ['} else {']
         for action in action_list:
             the_blocks = [b for b in self.actions if b.name == action and b.code_type == 'action']
@@ -539,8 +581,7 @@ class StateMachine_Python(StateMachine_Text):
         hdr += ['extern fsmStateMachine fsm_%s;' % self.name, '']
         hdr += ['#endif /* %s_H */' % uname]
 
-        txt = ['#include "%s.h"' % self.name]
-        txt += ['#include <stdlib.h>']
+        txt = ['#include <stdlib.h>']
         txt += ['#include <stdio.h>']
         txt += ['']
         tab_idx = 0
@@ -637,6 +678,7 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['    .transTab=trans_table,']
         txt += ['    .actionTab=action_funcs']
         txt += ['};', '']
+        txt += ['#ifdef %s_SELFTEST' % uname]
         for action in the_actions:
             txt += ['static int %s_test(fsmInstance *smi, fsmState state, fsmEvent event) {' %action]
             if action in classifier_list:
@@ -647,12 +689,12 @@ class StateMachine_Python(StateMachine_Text):
                 txt += ['    printf("State: %%-20s, Event: %%-20s, Action: %-20s\\n", smi->fsm->stateNames[state], smi->fsm->eventNames[event]);' % action]
                 txt += ['    return 0;']
             txt += ['}', '']
-        txt += ['void register_%s_actions(void) {' % (self.name)]
+        txt += ['static void register_%s_actions(void) {' % (self.name)]
         txt += ['    fsmStateMachine *fsm = &fsm_%s;' % (self.name)]
         for action in the_actions:
             txt += ['    fsmSetActionFunction(fsm, %s, %s_test);' % (action, action)]
         txt += ['};', '']
-        txt += ['void test_%s_actions(void) {' % (self.name)]
+        txt += ['static void test_%s_actions(void) {' % (self.name)]
         txt += ['    fsmStateMachine *fsm = &fsm_%s;' % (self.name)]
         txt += ['    fsmInstance smi = { .name="test", .fsm=fsm };']
         txt += ['    fsmState state;']
@@ -670,7 +712,26 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['                        printf("       %s ===> %s\\n", fsm->stateNames[state], fsm->stateNames[smi.currentState]);']
         txt += ['                }']
         txt += ['            }']
+        for test in self.tests:
+            print "Test::", test
+            txt += ['    do {']
+            txt += ['        smi.currentState = %s;' % test.tests[0]]
+            for t in test.tests:
+                if t in the_states:
+                    txt += ['        if (smi.currentState != %s) {' % t]
+                    txt += ['            printf("State is %%s but expected %s\\n", fsm->stateNames[smi.currentState]);' % t]
+                    txt += ['            break;']
+                    txt += ['        }']
+                else:
+                    txt += ['        fsmRunStateMachine(&smi, %s);' % t]
+            txt += ['        printf("Test Passed: %s\\n");' % repr(test)]
+            txt += ['    } while (0);']
         txt += ['};', '']
+        txt += ['int main(int argc, char *argv[]) {']
+        txt += ['    fsmPrintStateMachine(&fsm_%s);' % (self.name)]
+        txt += ['    test_%s_actions();' % (self.name)]
+        txt += ['};', '']
+        txt += ['#endif /* %s_SELFTEST */' % uname]
         return (hdr, txt)
 
 if __name__ == "__main__":

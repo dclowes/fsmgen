@@ -133,7 +133,7 @@ int fsmRunStateEvent(fsmInstance *smi, fsmEvent ev) {
             }
         }
     } while (next_event > 0);
-    return 0;
+    return next_state;
 }
 
 int fsmRunStateMachine(fsmInstance *smi, fsmEvent ev) {
