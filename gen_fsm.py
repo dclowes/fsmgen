@@ -1,18 +1,21 @@
 #!/usr/bin/env python
 # Author: Douglas Clowes (douglas.clowes@ansto.gov.au) Aug 2015
-# vim: ft=python ts=8 sts=4 sw=4 expandtab autoindent smartindent
+# vim: ft=python ts=8 sts=4 sw=4 expandtab autoindent smartindent nocindent
 #
 
 # pylint: disable=invalid-name
 # pylint: disable=line-too-long
 # pylint: disable=too-many-lines
+# pylint: disable=too-many-locals
 # pylint: disable=too-many-branches
 # pylint: disable=too-many-statements
+# pylint: disable=too-many-return-statements
 # pylint: disable=missing-docstring
 # pylint: disable=global-statement
+# pylint: disable=unused-argument
 #
 import os
-import re
+#import re
 import ply.lex as lex
 import ply.yacc as yacc
 import statemachine
@@ -36,9 +39,6 @@ def FormatEvent(event):
     return txt
 
 def Build_StateMachine(sm):
-    action_list = []
-    classifier_list = []
-    test_list = []
     new_sm = statemachine.StateMachine(sm['Name'])
     the_states = sorted(sm['States'])
     print '**The States:', the_states
@@ -214,54 +214,6 @@ def Generate_TCL(sm):
                 txt += ['    proc %s {state event} {' % action]
                 txt += ['        ' + l for l in code]
                 txt += ['    }']
-    txt += ['}']
-    return txt
-
-def PrintStateMachine(sm):
-    print "Statemachine:"
-    for key in sorted(sm.keys()):
-        print key, sm[key]
-    print
-    txt = []
-    txt += ['digraph G {']
-    txt += ['  size="11,8";']
-    txt += ['  ratio="expand";']
-    txt += ['  rankdir=LR;']
-    txt += ['  node [shape=plaintext];']
-    txt += ['  labelloc="t";']
-    txt += ['  label=<<B>%s</B>>' % sm['Filename']]
-    txt += ['']
-    if len(sm['Events']) > 0:
-        print "Events:", ", ".join([FormatEvent(e) for e in sorted(sm['Events'])])
-    if len(sm['States']) > 0:
-        print "States:", ", ".join(sorted(sm['States']))
-        for state in sorted(sm['States']):
-            print "    %s" % state
-            if state in sm['Blocks']:
-                label = ['<TABLE><TR><TD PORT="f0"><B>']
-                label += ['%s' % state]
-                label += ['</B></TD></TR>']
-                for idx, event in enumerate(sm['Blocks'][state]):
-                    if len(event[2]) > 0:
-                        label += ['<TR><TD><TABLE>']
-                        label += ['<TR><TD PORT="f%d"><B>%s</B></TD></TR>' % (idx + 1, FormatEvent(event[1]))]
-                        label += ['<TR><TD>%s</TD></TR>' % '</TD></TR><TR><TD>'.join(event[2])]
-                        label += ['</TABLE></TD></TR>']
-                    else:
-                        label += ['<TR><TD PORT="f%d">%s</TD></TR>' % (idx + 1, FormatEvent(event[1]))]
-                label += ['</TABLE>']
-                txt += ['  %s[label=<%s>];' % (state, ''.join(label))]
-                for idx, event in enumerate(sm['Blocks'][state]):
-                    line = "        %s" % FormatEvent(event[1])
-                    if event[0] in [1]:
-                        line += " --> %s" % ", ".join(event[2])
-                    elif event[0] in [2, 4]:
-                        line += " -> %s" % ", ".join(event[2])
-                    if event[0] in [3, 4]:
-                        line += " => %s" % ", ".join(event[3])
-                        for e in event[3]:
-                            txt += ['    %s:f%d -> %s:f0;' % (state, idx + 1, e)]
-                    print line
     txt += ['}']
     return txt
 
@@ -715,7 +667,7 @@ def p_error(t):
     message += " " + repr(t.value)
     PrintParseError(message)
 
-def load_file(source_file, depth_list):
+def load_file(source_file):
     SourceFile = os.path.realpath(os.path.abspath(source_file))
     fd = open(SourceFile, 'r')
     LocalData = []
@@ -734,7 +686,7 @@ def process_source(source_file):
     Statemachine['Events'] = []
     Statemachine['Blocks'] = {}
     Statemachine['Code'] = {}
-    SourceData = load_file(source_file, [])
+    SourceData = load_file(source_file)
     if args.yaccdebug:
         yaccer.parse('\n'.join(SourceData), debug=True)
     else:
@@ -743,19 +695,11 @@ def process_source(source_file):
         print "Statemachine:", Statemachine
     new_sm = statemachine.StateMachine_Python(Statemachines[0])
 
-    txt = PrintStateMachine(Statemachine)
+    txt = new_sm.DotStateMachine()
     text = open("%s.dot" % source_file, "w")
     text.write('\n'.join(txt))
     text.close()
     dot_cmd = "%s -Tsvg -o %s.svg %s.dot" % (args.dot, source_file, source_file)
-    print dot_cmd
-    os.system(dot_cmd)
-
-    txt = new_sm.DotStateMachine()
-    text = open("%s.new.dot" % source_file, "w")
-    text.write('\n'.join(txt))
-    text.close()
-    dot_cmd = "%s -Tsvg -o %s.new.svg %s.new.dot" % (args.dot, source_file, source_file)
     print dot_cmd
     os.system(dot_cmd)
 
@@ -780,10 +724,10 @@ def process_source(source_file):
     text.write('</TD></TR></TABLE>\n')
     text.write('</TD></TR>\n')
 
-    text.write(TABLE_END + HDR_FMT % 'New State Diagram' + TABLE_START)
+    text.write(TABLE_END + HDR_FMT % 'State Diagram' + TABLE_START)
 
     text.write('<TR><TD ALIGN="center">\n')
-    text.write('<img src="%s.new.svg" alt="%s.new.svg"/>\n' % (source_file, source_file))
+    text.write('<img src="%s.svg" alt="%s.svg"/>\n' % (source_file, source_file))
     text.write('</TD></TR>\n')
 
     text.write(TABLE_END + HDR_FMT % 'State Table 1' + TABLE_START)
@@ -848,6 +792,9 @@ def process_source(source_file):
     text.write('</TABLE>\n')
     text.write('</HTML>\n')
     text.close()
+    pdf_cmd = 'wkhtmltopdf -T 10mm -B 10mm %s.html %s.pdf' % (source_file, source_file)
+    print pdf_cmd
+    os.system(pdf_cmd)
 
 def main():
     global lexer, yaccer
