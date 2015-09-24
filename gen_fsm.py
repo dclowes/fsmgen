@@ -556,6 +556,7 @@ def load_file(source_file):
 def process_source(source_file):
     from xml.sax.saxutils import escape
     global Statemachine
+    basename = os.path.basename(source_file)
     Statemachine = {}
     Statemachine['Filename'] = source_file
     Statemachine['States'] = []
@@ -572,7 +573,7 @@ def process_source(source_file):
         print "Statemachine:", Statemachine
     new_sm = statemachine.StateMachine_Python(Statemachines[0])
 
-    txt = new_sm.DotStateMachine()
+    txt = new_sm.DotStateMachine2()
     text = open("%s.dot" % source_file, "w")
     text.write('\n'.join(txt))
     text.close()
@@ -604,7 +605,7 @@ def process_source(source_file):
     text.write(TABLE_END + HDR_FMT % 'State Diagram' + TABLE_START)
 
     text.write('<TR><TD ALIGN="center">\n')
-    text.write('<img src="%s.svg" alt="%s.svg"/>\n' % (source_file, source_file))
+    text.write('<img src="%s.svg" alt="%s.svg"/>\n' % (basename, basename))
     text.write('</TD></TR>\n')
 
     text.write(TABLE_END + HDR_FMT % 'State Table 1' + TABLE_START)
@@ -666,7 +667,7 @@ def process_source(source_file):
     text.write(TABLE_END + HDR_FMT % 'Old State Diagram' + TABLE_START)
 
     text.write('<TR><TD ALIGN="center">\n')
-    text.write('<img src="%s.svg" alt="%s.svg"/>\n' % (source_file, source_file))
+    text.write('<img src="%s.svg" alt="%s.svg"/>\n' % (basename, basename))
     text.write('</TD></TR>\n')
 
     text.write('</TABLE>\n')

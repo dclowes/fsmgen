@@ -270,6 +270,48 @@ class StateMachine_Text(StateMachine):
         txt += ['}']
         return txt
 
+    def DotStateMachine2(self):
+        the_states = sorted([s.name for s in self.states])
+        txt = ['digraph G {']
+        txt += ['  size="11,8";']
+        txt += ['  ratio="expand";']
+        txt += ['  rankdir=LR;']
+        txt += ['  node [shape=plaintext];']
+        txt += ['  labelloc="t";']
+        txt += ['  label=<<B>%s</B>>' % self.name]
+        txt += ['']
+        colors = ['red', 'green', 'blue', 'orange', 'purple', 'magenta', 'cyan', 'yellow']
+        for state in the_states:
+            label = ['<TABLE><TR><TD PORT="%s"><B>' % state]
+            label += ['%s' % state]
+            label += ['</B></TD></TR>']
+            the_blocks = [b for b in sorted(self.classifiers) if b.source == state]
+            the_blocks += [b for b in sorted(self.transitions) if b.source == state]
+            idx = 0
+            for block in the_blocks:
+                label += ['<TR><TD><TABLE>']
+                label += ['<TR><TD PORT="%s">' % block.event]
+                label += ['<B>%s</B></TD></TR>' % block.event]
+                if len(block.actions) > 0:
+                    label += ['<TR><TD>%s</TD></TR>' % '</TD></TR><TR><TD>'.join(block.actions)]
+                label += ['</TABLE></TD></TR>']
+            label += ['</TABLE>']
+            txt += ['  %s[label=<%s>];' % (state, ''.join(label))]
+            for block in the_blocks:
+                if isinstance(block, Transition):
+                    for t in block.targets:
+                        txt += ['    %s:%s -> %s:%s;' % (state, block.event, t, t)]
+                else:
+                    style = 'dir=both;arrowtail=inv;style=dotted;color=%s' % colors[idx]
+                    idx += 1
+                    if idx >= len(colors):
+                        idx = 0
+                    for t in block.targets:
+                        if t[0] in [b.event for b in the_blocks]:
+                            txt += ['    %s:%s -> %s:%s[%s];' % (state, block.event, state, t[0], style)]
+        txt += ['}']
+        return txt
+
     def TextStateMachine(self):
         the_states = sorted([s.name for s in self.states])
         the_events = sorted([e.name for e in self.events])
