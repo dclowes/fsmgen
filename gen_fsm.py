@@ -598,7 +598,10 @@ def process_source(source_file):
     text.write('<TR><TD ALIGN="left" VALIGN="top">\n')
     text.write('<PRE>\n' + '\n'.join(SourceData) + '\n</PRE>\n')
     text.write('</TD><TD ALIGN="left">\n')
-    text.write('<PRE>\n' + '\n'.join(new_sm.TextStateMachine()) + '\n</PRE>\n')
+    txt = new_sm.TextStateMachine()
+    with open('%s.txt' % source_file, 'w') as fdo:
+        fdo.write('\n'.join(txt))
+    text.write('<PRE>\n' + '\n'.join(txt) + '\n</PRE>\n')
     text.write('</TD></TR></TABLE>\n')
     text.write('</TD></TR>\n')
 
