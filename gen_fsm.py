@@ -571,6 +571,9 @@ def process_source(source_file):
         yaccer.parse('\n'.join(SourceData))
     if Verbose:
         print "Statemachine:", Statemachine
+    if len(Statemachines) > 1:
+        for sm in Statemachines:
+            print "Statemachine:", sm['Name']
     new_sm = statemachine.StateMachine_Python(Statemachines[0])
 
     txt = new_sm.DotStateMachine2()
@@ -679,7 +682,7 @@ def process_source(source_file):
     pdf_cmd = 'wkhtmltopdf -T 10mm -B 10mm %s.html %s.pdf' % (source_file, source_file)
     print pdf_cmd
     #os.system(pdf_cmd)
-    gcc_cmd = 'gcc -D%s_SELFTEST %s.c statemachine.c' % (new_sm.name.upper(), source_file)
+    gcc_cmd = 'gcc -DUNIT_TEST %s.c statemachine.c' % (source_file)
     print gcc_cmd
 
 def main():

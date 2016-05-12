@@ -720,7 +720,7 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['    .transTab=trans_table,']
         txt += ['    .actionTab=action_funcs']
         txt += ['};', '']
-        txt += ['#ifdef %s_SELFTEST' % uname]
+        txt += ['#ifdef UNIT_TEST']
         for action in the_actions:
             txt += ['static int %s_test(fsmInstance *smi, fsmState state, fsmEvent event) {' %action]
             if action in classifier_list:
@@ -773,7 +773,7 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['    fsmPrintStateMachine(&fsm_%s);' % (self.name)]
         txt += ['    test_%s_actions();' % (self.name)]
         txt += ['};', '']
-        txt += ['#endif /* %s_SELFTEST */' % uname]
+        txt += ['#endif /* UNIT_TEST */']
         return (hdr, txt)
 
 if __name__ == "__main__":
