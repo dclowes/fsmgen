@@ -10,6 +10,7 @@
 # pylint: disable=too-many-branches
 # pylint: disable=too-many-statements
 # pylint: disable=too-many-return-statements
+# pylint: disable=too-many-instance-attributes
 # pylint: disable=missing-docstring
 # pylint: disable=global-statement
 # pylint: disable=too-few-public-methods
@@ -76,6 +77,7 @@ class Test(object):
 class StateMachine(object):
     def __init__(self, name):
         self.name = name
+        self.uname = name.upper()
         self.actions = []
         self.events = []
         self.states = []
@@ -138,7 +140,7 @@ class StateMachine(object):
 
 class StateMachine_Text(StateMachine):
     def __init__(self, other):
-        StateMachine.__init__(self, "Unknown")
+        StateMachine.__init__(self, other.name)
         if isinstance(other, StateMachine):
             self.name = other.name
             self.actions = other.actions
@@ -147,6 +149,48 @@ class StateMachine_Text(StateMachine):
             self.tests = other.tests
             self.transitions = other.transitions
             self.classifiers = other.classifiers
+
+    def TextStateMachine(self):
+        the_states = sorted([s.name for s in self.states])
+        the_events = sorted([e.name for e in self.events])
+        txt = ['STATEMACHINE %s {' % self.name]
+        txt += ['  STATES\n    %s;' % ',\n    '.join(the_states)]
+        txt += ['  EVENTS\n    %s;' % ',\n    '.join(the_events)]
+        for state in the_states:
+            txt += ['  State %s {' % state]
+            the_blocks = [b for b in self.classifiers if b.source == state]
+            the_blocks += [b for b in self.transitions if b.source == state]
+            for block in the_blocks:
+                line = '%s' % block.event
+                if isinstance(block, Classifier):
+                    line += ' --> %s' % ', '.join(block.actions)
+                    if len(block.targets) > 0:
+                        next_events = sorted([e[0] for e in block.targets])
+                        line += ' => %s' % ', '.join(next_events)
+                else:
+                    if len(block.actions) > 0:
+                        line += ' -> %s' % ', '.join(block.actions)
+                    if len(block.targets) > 0:
+                        line += ' => %s' % ', '.join(block.targets)
+                txt += ['    %s;' % line]
+            txt += ['  }']
+        for action in sorted(self.actions, key=lambda action: action.name.lower()):
+            print "##Action:", action
+            txt += ['  CODE %s %s {' % (action.code_type, action.name)]
+            for action_item in action.code_text:
+                txt += ['    @%s' % action_item[0]]
+                for line in action_item[1]:
+                    txt += [line]
+                txt += ['    @END']
+            txt += ['  }']
+        for test in self.tests:
+            txt += ['  Test %s;' % ',\n    '.join(test.tests)]
+        txt += ['}']
+        return txt
+
+class StateMachine_HTML(StateMachine_Text):
+    def __init__(self, other):
+        StateMachine_Text.__init__(self, other)
 
     def StateTable1(self):
         the_states = sorted([s.name for s in self.states])
@@ -312,44 +356,6 @@ class StateMachine_Text(StateMachine):
         txt += ['}']
         return txt
 
-    def TextStateMachine(self):
-        the_states = sorted([s.name for s in self.states])
-        the_events = sorted([e.name for e in self.events])
-        txt = ['STATEMACHINE %s {' % self.name]
-        txt += ['  STATES\n    %s;' % ',\n    '.join(the_states)]
-        txt += ['  EVENTS\n    %s;' % ',\n    '.join(the_events)]
-        for state in the_states:
-            txt += ['  State %s {' % state]
-            the_blocks = [b for b in self.classifiers if b.source == state]
-            the_blocks += [b for b in self.transitions if b.source == state]
-            for block in the_blocks:
-                line = '%s' % block.event
-                if isinstance(block, Classifier):
-                    line += ' --> %s' % ', '.join(block.actions)
-                    if len(block.targets) > 0:
-                        next_events = sorted([e[0] for e in block.targets])
-                        line += ' => %s' % ', '.join(next_events)
-                else:
-                    if len(block.actions) > 0:
-                        line += ' -> %s' % ', '.join(block.actions)
-                    if len(block.targets) > 0:
-                        line += ' => %s' % ', '.join(block.targets)
-                txt += ['    %s;' % line]
-            txt += ['  }']
-        for action in sorted(self.actions, key=lambda action: action.name.lower()):
-            print "##Action:", action
-            txt += ['  CODE %s %s {' % (action.code_type, action.name)]
-            for action_item in action.code_text:
-                txt += ['    @%s' % action_item[0]]
-                for line in action_item[1]:
-                    txt += [line]
-                txt += ['    @END']
-            txt += ['  }']
-        for test in self.tests:
-            txt += ['  Test %s;' % ',\n    '.join(test.tests)]
-        txt += ['}']
-        return txt
-
 class StateMachine_Python(StateMachine_Text):
     def __init__(self, other):
         StateMachine_Text.__init__(self, other)
@@ -472,6 +478,10 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['# vim: ft=python ts=8 sts=4 sw=4 expandtab autoindent smartindent nocindent']
         return txt
 
+class StateMachine_TCL(StateMachine_Text):
+    def __init__(self, other):
+        StateMachine_Text.__init__(self, other)
+
     def Generate_TCL(self):
         the_states = sorted([s.name for s in self.states])
         the_events = sorted([e.name for e in self.events])
@@ -585,6 +595,35 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['}']
         return txt
 
+class StateMachine_GCC(StateMachine_Text):
+    def __init__(self, other):
+        StateMachine_Text.__init__(self, other)
+        self.UseEnum = True
+
+    def mkName(self, name):
+        if self.UseEnum:
+            return '%s_%s' % (self.uname, name)
+        else:
+            return  'FSM_%s.%s' % (self.uname, name)
+
+    def mkState(self, name):
+        if self.UseEnum:
+            return '%s_%s' % (self.uname, name)
+        else:
+            return  'FSM_%s.%s' % (self.uname, name)
+
+    def mkEvent(self, name):
+        if self.UseEnum:
+            return '%s_%s' % (self.uname, name)
+        else:
+            return  'FSM_%s.%s' % (self.uname, name)
+
+    def mkAction(self, name):
+        if self.UseEnum:
+            return '%s_%s' % (self.uname, name)
+        else:
+            return  'FSM_%s.%s' % (self.uname, name)
+
     def Generate_C(self):
         the_states = sorted([s.name for s in self.states])
         the_events = sorted([e.name for e in self.events])
@@ -603,23 +642,63 @@ class StateMachine_Python(StateMachine_Text):
         hdr = ['#ifndef %s_H' % uname]
         hdr += ['#define %s_H' % uname]
         hdr += ['#include "statemachine.h"']
-        hdr += ['#define %s_NUM_STATES %d' % (uname, len(the_states))]
-        hdr += ['#define %s_NUM_EVENTS %d' % (uname, len(the_events))]
-        hdr += ['#define %s_NUM_TRANS %d' % (uname, len(the_blocks))]
-        hdr += ['#define %s_NUM_ACTIONS %d' % (uname, len(the_actions))]
-        hdr += ['#define %s_MAX_ACTIONS %d' % (uname, max_actions)]
-        hdr += ['enum %s_STATES {' % uname]
-        for idx, state in enumerate(the_states):
-            hdr += ['    %s = %d,' % (state, idx + 1)]
-        hdr += ['};']
-        hdr += ['enum %s_EVENTS {' % uname]
-        for idx, event in enumerate(the_events):
-            hdr += ['    %s = %d,' % (event, idx + 1)]
-        hdr += ['};', '']
-        hdr += ['enum %s_ACTIONS {' % uname]
-        for idx, action in enumerate(the_actions):
-            hdr += ['    %s = %d,' % (action, idx + 1)]
-        hdr += ['};', '']
+        if self.UseEnum == True:
+            hdr += ['#define %s %d' % (self.mkName('NUM_STATES'), len(the_states))]
+            hdr += ['#define %s %d' % (self.mkName('NUM_EVENTS'), len(the_events))]
+            hdr += ['#define %s %d' % (self.mkName('NUM_TRANS'), len(the_blocks))]
+            hdr += ['#define %s %d' % (self.mkName('NUM_ACTIONS'), len(the_actions))]
+            hdr += ['#define %s %d' % (self.mkName('MAX_ACTIONS'), max_actions)]
+            hdr += ['enum %s_STATES {' % uname]
+            for idx, state in enumerate(the_states):
+                hdr += ['    %s = %d,' % (self.mkState(state), idx + 1)]
+            hdr += ['};']
+            hdr += ['enum %s_EVENTS {' % uname]
+            for idx, event in enumerate(the_events):
+                hdr += ['    %s = %d,' % (self.mkEvent(event), idx + 1)]
+            hdr += ['};', '']
+            hdr += ['enum %s_ACTIONS {' % uname]
+            for idx, action in enumerate(the_actions):
+                hdr += ['    %s = %d,' % (self.mkEvent(action), idx + 1)]
+            hdr += ['};', '']
+        else:
+            tkns = []
+            tkns += [('NUM_STATES', len(the_states))]
+            tkns += [('NUM_EVENTS', len(the_events))]
+            tkns += [('NUM_TRANS', len(the_blocks))]
+            tkns += [('NUM_ACTIONS', len(the_actions))]
+            tkns += [('MAX_ACTIONS', max_actions)]
+            stts = []
+            for idx, state in enumerate(the_states):
+                stts += [(state, idx + 1)]
+            evts = []
+            for idx, event in enumerate(the_events):
+                evts += [(event, idx + 1)]
+            acts = []
+            for idx, action in enumerate(the_actions):
+                acts += [(action, idx + 1)]
+            print "tkns:", tkns
+            print "stts:", stts
+            print "evts:", evts
+            print "acts:", acts
+            hdr += ['static const struct {']
+            for item in tkns:
+                hdr += ['    int %s;' % item[0]]
+            for item in stts:
+                hdr += ['    int %s;' % item[0]]
+            for item in evts:
+                hdr += ['    int %s;' % item[0]]
+            for item in acts:
+                hdr += ['    int %s;' % item[0]]
+            hdr += ['} FSM_%s = {' % uname]
+            for item in tkns:
+                hdr += ['    .%s = %d,' % (item[0], item[1])]
+            for item in stts:
+                hdr += ['    .%s = %d,' % (item[0], item[1])]
+            for item in evts:
+                hdr += ['    .%s = %d,' % (item[0], item[1])]
+            for item in acts:
+                hdr += ['    .%s = %d,' % (item[0], item[1])]
+            hdr += ['};', '']
         hdr += ['extern fsmStateMachine fsm_%s;' % self.name, '']
         hdr += ['#endif /* %s_H */' % uname]
 
@@ -641,35 +720,35 @@ class StateMachine_Python(StateMachine_Text):
                 for block in the_blocks:
                     if block.source == state:
                         if block.event == event:
-                            actions = ', '.join(block.actions)
+                            actions = ', '.join([self.mkAction(a) for a in block.actions])
                             act_cnt = len(block.actions)
-                            target = "0"
+                            target = state
                             if isinstance(block, Transition) and len(block.targets) > 0:
                                 target = block.targets[0]
                             if act_cnt > 0:
                                 act_txt += ['    %s,' % actions]
+                            line = ''
+                            line += '    { /* %d */\n' % (tab_idx)
+                            line += '        .si=%-*s,\n' % (slen, self.mkState(state))
+                            line += '        .ei=%-*s,\n' % (elen, self.mkEvent(event))
                             if isinstance(block, Transition):
-                                act_typ = 'fsmActionTrans'
-                                act_typ += ', .so=%s' % target
-                                act_typ += ', .ac_start=%d' % act_idx
-                                act_typ += ', .ac_count=%d' % act_cnt
+                                line += '        .ac_type=fsmActionTrans,\n'
+                                line += '        .so=%s,\n' % self.mkState(target)
+                                line += '        .ac_start=%d,\n' % act_idx
+                                line += '        .ac_count=%d,\n' % act_cnt
                             else:
                                 evt_cnt = len(block.targets)
                                 if evt_cnt > 0:
-                                    evt_txt += ['    %s,' % ', '.join([b[0] for b in block.targets])]
-                                act_typ = 'fsmActionClass'
-                                act_typ += ', .ac_class=%s' % block.actions[0]
-                                act_typ += ', .ev_start=%d' % evt_idx
+                                    evt_txt += ['    %s,' % ', '.join([self.mkEvent(b[0]) for b in block.targets])]
+                                line += '        .ac_type=fsmActionClass,\n'
+                                line += '        .ac_class=%s,\n' % self.mkAction(block.actions[0])
+                                line += '        .ev_start=%d,\n' % evt_idx
                                 evt_idx += evt_cnt
-                                act_typ += ', .ev_count=%s' % evt_cnt
+                                line += '        .ev_count=%s,\n' % evt_cnt
                                 for action in block.actions:
                                     if action not in classifier_list:
                                         classifier_list[action] = block.targets[0]
-                            line = '    {.si=%-*s, .ei=%-*s, .ac_type=%s},' % (slen, state, elen, event, act_typ)
-                            if False:
-                                line = '%s /* %d %s */' % (line, tab_idx, repr(block))
-                            else:
-                                line = '%s /* %d */' % (line, tab_idx)
+                            line += '    },'
                             tab_txt += [line]
                             tab_idx += 1
                             act_idx += act_cnt
@@ -685,32 +764,32 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['']
         txt += ['static char *state_names[] = {', '    0,']
         for state in the_states:
-            txt += ['    "%s",' % state]
+            txt += ['    "%s",' % self.mkState(state)]
         txt += ['    0', '};', '']
         txt += ['static char *event_names[] = {', '    0,']
         for event in the_events:
-            txt += ['    "%s",' % event]
+            txt += ['    "%s",' % self.mkEvent(event)]
         txt += ['    0', '};', '']
         txt += ['static char *action_names[] = {', '    0,']
         for action in the_actions:
-            txt += ['    "%s",' % action]
+            txt += ['    "%s",' % self.mkAction(action)]
         txt += ['    0', '};', '']
         txt += ['struct fsmActionTab_t {']
         txt += ['    fsmActionFunc *action;']
         txt += ['};', '']
-        txt += ['static fsmActionFunc action_funcs[%s_NUM_ACTIONS+1];' % uname]
+        txt += ['static fsmActionFunc action_funcs[%s+1];' % self.mkName('NUM_ACTIONS')]
         txt += ['']
         txt += ['fsmStateMachine fsm_%s = {' % self.name]
         txt += ['    .name="%s",' % self.name]
-        txt += ['    .numStates=%s_NUM_STATES,' % uname]
-        txt += ['    .numEvents=%s_NUM_EVENTS,' % uname]
-        txt += ['    .numTrans=%s_NUM_TRANS,' % uname]
-        txt += ['    .numActions=%s_NUM_ACTIONS,' % uname]
-        txt += ['    .maxActions=%s_MAX_ACTIONS,' % uname]
+        txt += ['    .numStates=%s,' % self.mkName('NUM_STATES')]
+        txt += ['    .numEvents=%s,' % self.mkName('NUM_EVENTS')]
+        txt += ['    .numTrans=%s,' % self.mkName('NUM_TRANS')]
+        txt += ['    .numActions=%s,' % self.mkName('NUM_ACTIONS')]
+        txt += ['    .maxActions=%s,' % self.mkName('MAX_ACTIONS')]
         if 'Entry' in the_events:
-            txt += ['    .entryEvent=Entry,']
+            txt += ['    .entryEvent=%s,' % (self.mkEvent('Entry'))]
         if 'Exit' in the_events:
-            txt += ['    .exitEvent=Exit,']
+            txt += ['    .exitEvent=%s,' % (self.mkEvent('Exit'))]
         txt += ['    .mapTab=map_table,']
         txt += ['    .actTab=action_table,']
         txt += ['    .evtTab=event_table,']
@@ -726,7 +805,7 @@ class StateMachine_Python(StateMachine_Text):
             if action in classifier_list:
                 next_event = classifier_list[action][0]
                 txt += ['    printf("State: %%-20s, Event: %%-20s, Action: %-20s, NextEvent: %s\\n", smi->fsm->stateNames[state], smi->fsm->eventNames[event]);' % (action, next_event)]
-                txt += ['    return %s;' % next_event]
+                txt += ['    return %s;' % self.mkEvent(next_event)]
             else:
                 txt += ['    printf("State: %%-20s, Event: %%-20s, Action: %-20s\\n", smi->fsm->stateNames[state], smi->fsm->eventNames[event]);' % action]
                 txt += ['    return 0;']
@@ -734,7 +813,7 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['static void register_%s_actions(void) {' % (self.name)]
         txt += ['    fsmStateMachine *fsm = &fsm_%s;' % (self.name)]
         for action in the_actions:
-            txt += ['    fsmSetActionFunction(fsm, %s, %s_test);' % (action, action)]
+            txt += ['    fsmSetActionFunction(fsm, %s, %s_test);' % (self.mkAction(action), action)]
         txt += ['};', '']
         txt += ['static void test_%s_actions(void) {' % (self.name)]
         txt += ['    fsmStateMachine *fsm = &fsm_%s;' % (self.name)]

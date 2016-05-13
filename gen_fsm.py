@@ -554,9 +554,7 @@ def load_file(source_file):
     return LocalData
 
 def process_source(source_file):
-    from xml.sax.saxutils import escape
     global Statemachine
-    basename = os.path.basename(source_file)
     Statemachine = {}
     Statemachine['Filename'] = source_file
     Statemachine['States'] = []
@@ -574,12 +572,21 @@ def process_source(source_file):
     if len(Statemachines) > 1:
         for sm in Statemachines:
             print "Statemachine:", sm['Name']
-    new_sm = statemachine.StateMachine_Python(Statemachines[0])
+    generate_source(Statemachines[0], SourceData, source_file)
 
-    txt = new_sm.DotStateMachine2()
-    text = open("%s.dot" % source_file, "w")
-    text.write('\n'.join(txt))
-    text.close()
+def generate_source(the_fsm, SourceData, source_file):
+    from xml.sax.saxutils import escape
+    basename = os.path.basename(source_file)
+    source_file = os.path.dirname(source_file) + the_fsm.name + ".fsm"
+    # Generate the HTML
+    fsm_text = statemachine.StateMachine_Text(the_fsm)
+    fsm_html = statemachine.StateMachine_HTML(the_fsm)
+    fsm_tcl = statemachine.StateMachine_TCL(the_fsm)
+    fsm_python = statemachine.StateMachine_Python(the_fsm)
+    fsm_gcc = statemachine.StateMachine_GCC(the_fsm)
+    txt_dot = fsm_html.DotStateMachine2()
+    with open("%s.dot" % source_file, "w") as fdo:
+        fdo.write('\n'.join(txt_dot))
     dot_cmd = "%s -Tsvg -o %s.svg %s.dot" % (args.dot, source_file, source_file)
     print dot_cmd
     os.system(dot_cmd)
@@ -601,10 +608,10 @@ def process_source(source_file):
     text.write('<TR><TD ALIGN="left" VALIGN="top">\n')
     text.write('<PRE>\n' + '\n'.join(SourceData) + '\n</PRE>\n')
     text.write('</TD><TD ALIGN="left">\n')
-    txt = new_sm.TextStateMachine()
+    txt_text = fsm_text.TextStateMachine()
     with open('%s.txt' % source_file, 'w') as fdo:
-        fdo.write('\n'.join(txt))
-    text.write('<PRE>\n' + '\n'.join(txt) + '\n</PRE>\n')
+        fdo.write('\n'.join(txt_text))
+    text.write('<PRE>\n' + '\n'.join(txt_text) + '\n</PRE>\n')
     text.write('</TD></TR></TABLE>\n')
     text.write('</TD></TR>\n')
 
@@ -617,57 +624,57 @@ def process_source(source_file):
     text.write(TABLE_END + HDR_FMT % 'State Table 1' + TABLE_START)
 
     text.write('<TR><TD ALIGN="center">\n')
-    txt = new_sm.StateTable1()
+    txt = fsm_html.StateTable1()
     text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
 
     text.write(TABLE_END + HDR_FMT % 'State Table 2' + TABLE_START)
 
     text.write('<TR><TD ALIGN="center">\n')
-    txt = new_sm.StateTable2()
+    txt = fsm_html.StateTable2()
     text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
 
     text.write(TABLE_END + HDR_FMT % 'State Table 3' + TABLE_START)
 
     text.write('<TR><TD ALIGN="center">\n')
-    txt = new_sm.StateTable3()
+    txt = fsm_html.StateTable3()
     text.write('\n'.join(txt))
     text.write('</TD></TR>\n')
 
     text.write(TABLE_END + HDR_FMT % 'in Python' + TABLE_START)
 
     text.write('<TR><TD ALIGN="left">\n')
-    txt = new_sm.Generate_Python()
+    txt_python = fsm_python.Generate_Python()
     with open('%s.py' % source_file, 'w') as fdo:
-        fdo.write('\n'.join(txt))
-    text.write('<PRE>' + '\n'.join(txt) + '</PRE>')
+        fdo.write('\n'.join(txt_python))
+    text.write('<PRE>' + '\n'.join(txt_python) + '</PRE>')
     text.write('</TD></TR>\n')
 
     text.write(TABLE_END + HDR_FMT % 'in TCL' + TABLE_START)
 
     text.write('<TR><TD ALIGN="left">\n')
-    txt = new_sm.Generate_TCL()
+    txt_tcl = fsm_tcl.Generate_TCL()
     with open('%s.tcl' % source_file, 'w') as fdo:
-        fdo.write('\n'.join(txt))
-    text.write('<PRE>' + '\n'.join(txt) + '</PRE>')
+        fdo.write('\n'.join(txt_tcl))
+    text.write('<PRE>' + '\n'.join(txt_tcl) + '</PRE>')
     text.write('</TD></TR>\n')
 
     text.write(TABLE_END + HDR_FMT % 'in C' + TABLE_START)
 
-    hdr, txt = new_sm.Generate_C()
+    hdr_gcc, txt_gcc = fsm_gcc.Generate_C()
     with open('%s.h' % source_file, 'w') as fdo:
-        fdo.write('\n'.join(hdr))
+        fdo.write('\n'.join(hdr_gcc))
         fdo.write('\n')
+    txt_gcc.insert(0, '#include "%s.h"' % source_file)
     with open('%s.c' % source_file, 'w') as fdo:
-        fdo.write('#include "%s.h"\n' % source_file)
-        fdo.write('\n'.join(txt))
+        fdo.write('\n'.join(txt_gcc))
         fdo.write('\n')
     text.write('<TR><TD ALIGN="left">\n')
-    text.write('<PRE>' + escape('\n'.join(hdr)) + '</PRE>')
+    text.write('<PRE>' + escape('\n'.join(hdr_gcc)) + '</PRE>')
     text.write('</TD></TR>\n')
     text.write('<TR><TD ALIGN="left">C Code file\n')
-    text.write('<PRE>' + escape('\n'.join(txt)) + '</PRE>')
+    text.write('<PRE>' + escape('\n'.join(txt_gcc)) + '</PRE>')
     text.write('</TD></TR>\n')
 
     text.write(TABLE_END + HDR_FMT % 'Old State Diagram' + TABLE_START)
