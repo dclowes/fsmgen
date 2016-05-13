@@ -43,7 +43,10 @@ def Build_StateMachine(sm):
     the_states = sorted(sm['States'])
     print '**The States:', the_states
     for s in the_states:
-        new_sm.addState(statemachine.State(s))
+        if s in sm['Inherits']:
+            new_sm.addState(statemachine.State(s, sm['Inherits'][s]))
+        else:
+            new_sm.addState(statemachine.State(s))
     the_events = []
     for b in sm['Blocks']:
         print "**The Block:", b
@@ -380,14 +383,18 @@ def p_state_block(p):
     '''
     state_block : id_or_str LBRACE state_code_list RBRACE
                 | id_or_str EQUALS LBRACE state_code_list RBRACE
+                | id_or_str LPAREN state_list RPAREN LBRACE state_code_list RBRACE
     '''
     ReportP(p, "state_block")
-    if len(p) > 5: # it has the EQUALS in there
-        Statemachine['Blocks'][p[1]] = p[4]
-        p[0] = [p[1]] + p[4]
-    else:
+    if len(p) == 5: # simple
         Statemachine['Blocks'][p[1]] = p[3]
         p[0] = [p[1]] + p[3]
+    elif len(p) == 6: # it has the EQUALS in there
+        Statemachine['Blocks'][p[1]] = p[4]
+        p[0] = [p[1]] + p[4]
+    elif len(p) == 8:
+        Statemachine['Blocks'][p[1]] = p[6]
+        Statemachine['Inherits'][p[1]] = p[3]
 
 def p_state_code_list(p):
     '''
@@ -559,6 +566,7 @@ def process_source(source_file):
     Statemachine['Filename'] = source_file
     Statemachine['States'] = []
     Statemachine['Events'] = []
+    Statemachine['Inherits'] = {}
     Statemachine['Blocks'] = {}
     Statemachine['Tests'] = []
     Statemachine['Code'] = {}
@@ -569,15 +577,14 @@ def process_source(source_file):
         yaccer.parse('\n'.join(SourceData))
     if Verbose:
         print "Statemachine:", Statemachine
-    if len(Statemachines) > 1:
-        for sm in Statemachines:
-            print "Statemachine:", sm['Name']
+        for idx, sm in enumerate(Statemachines):
+            print "Statemachine[%d]:" % idx, sm
     generate_source(Statemachines[0], SourceData, source_file)
 
 def generate_source(the_fsm, SourceData, source_file):
     from xml.sax.saxutils import escape
-    basename = os.path.basename(source_file)
-    source_file = os.path.dirname(source_file) + the_fsm.name + ".fsm"
+    dest_file = os.path.dirname(source_file) + the_fsm.name + ".fsm"
+    basename = os.path.basename(dest_file)
     # Generate the HTML
     fsm_text = statemachine.StateMachine_Text(the_fsm)
     fsm_html = statemachine.StateMachine_HTML(the_fsm)
@@ -585,9 +592,9 @@ def generate_source(the_fsm, SourceData, source_file):
     fsm_python = statemachine.StateMachine_Python(the_fsm)
     fsm_gcc = statemachine.StateMachine_GCC(the_fsm)
     txt_dot = fsm_html.DotStateMachine2()
-    with open("%s.dot" % source_file, "w") as fdo:
+    with open("%s.dot" % dest_file, "w") as fdo:
         fdo.write('\n'.join(txt_dot))
-    dot_cmd = "%s -Tsvg -o %s.svg %s.dot" % (args.dot, source_file, source_file)
+    dot_cmd = "%s -Tsvg -o %s.svg %s.dot" % (args.dot, dest_file, dest_file)
     print dot_cmd
     os.system(dot_cmd)
 
@@ -595,9 +602,9 @@ def generate_source(the_fsm, SourceData, source_file):
     TABLE_END = '</TABLE>\n'
     HDR_FMT = '<P style="page-break-before: always" ALIGN="center">%s</P>\n'
 
-    text = open("%s.html" % source_file, "w")
+    text = open("%s.html" % dest_file, "w")
     text.write('<HTML>\n')
-    text.write('<TITLE>Finite State Machine %s</TITLE>\n' % source_file)
+    text.write('<TITLE>Finite State Machine %s</TITLE>\n' % dest_file)
 
     text.write('<P ALIGN="center">%s</P>\n' % 'Source Code')
 
@@ -609,7 +616,7 @@ def generate_source(the_fsm, SourceData, source_file):
     text.write('<PRE>\n' + '\n'.join(SourceData) + '\n</PRE>\n')
     text.write('</TD><TD ALIGN="left">\n')
     txt_text = fsm_text.TextStateMachine()
-    with open('%s.txt' % source_file, 'w') as fdo:
+    with open('%s.txt' % dest_file, 'w') as fdo:
         fdo.write('\n'.join(txt_text))
     text.write('<PRE>\n' + '\n'.join(txt_text) + '\n</PRE>\n')
     text.write('</TD></TR></TABLE>\n')
@@ -646,7 +653,7 @@ def generate_source(the_fsm, SourceData, source_file):
 
     text.write('<TR><TD ALIGN="left">\n')
     txt_python = fsm_python.Generate_Python()
-    with open('%s.py' % source_file, 'w') as fdo:
+    with open('%s.py' % dest_file, 'w') as fdo:
         fdo.write('\n'.join(txt_python))
     text.write('<PRE>' + '\n'.join(txt_python) + '</PRE>')
     text.write('</TD></TR>\n')
@@ -655,7 +662,7 @@ def generate_source(the_fsm, SourceData, source_file):
 
     text.write('<TR><TD ALIGN="left">\n')
     txt_tcl = fsm_tcl.Generate_TCL()
-    with open('%s.tcl' % source_file, 'w') as fdo:
+    with open('%s.tcl' % dest_file, 'w') as fdo:
         fdo.write('\n'.join(txt_tcl))
     text.write('<PRE>' + '\n'.join(txt_tcl) + '</PRE>')
     text.write('</TD></TR>\n')
@@ -663,11 +670,11 @@ def generate_source(the_fsm, SourceData, source_file):
     text.write(TABLE_END + HDR_FMT % 'in C' + TABLE_START)
 
     hdr_gcc, txt_gcc = fsm_gcc.Generate_C()
-    with open('%s.h' % source_file, 'w') as fdo:
+    with open('%s.h' % dest_file, 'w') as fdo:
         fdo.write('\n'.join(hdr_gcc))
         fdo.write('\n')
-    txt_gcc.insert(0, '#include "%s.h"' % source_file)
-    with open('%s.c' % source_file, 'w') as fdo:
+    txt_gcc.insert(0, '#include "%s.h"' % dest_file)
+    with open('%s.c' % dest_file, 'w') as fdo:
         fdo.write('\n'.join(txt_gcc))
         fdo.write('\n')
     text.write('<TR><TD ALIGN="left">\n')
@@ -686,10 +693,10 @@ def generate_source(the_fsm, SourceData, source_file):
     text.write('</TABLE>\n')
     text.write('</HTML>\n')
     text.close()
-    pdf_cmd = 'wkhtmltopdf -T 10mm -B 10mm %s.html %s.pdf' % (source_file, source_file)
+    pdf_cmd = 'wkhtmltopdf -T 10mm -B 10mm %s.html %s.pdf' % (dest_file, dest_file)
     print pdf_cmd
     #os.system(pdf_cmd)
-    gcc_cmd = 'gcc -DUNIT_TEST %s.c statemachine.c' % (source_file)
+    gcc_cmd = 'gcc -DUNIT_TEST %s.c statemachine.c' % (dest_file)
     print gcc_cmd
 
 def main():

@@ -32,11 +32,18 @@ class Event(object):
         return txt
 
 class State(object):
-    def __init__(self, name):
+    def __init__(self, name, base_list=None):
         self.name = name
+        if base_list == None:
+            self.base_list = []
+        else:
+            self.base_list = base_list
 
     def __repr__(self):
-        return self.name
+        if len(self.base_list) > 0:
+            return self.name + '(' + ', '.join(self.base_list) + ')'
+        else:
+            return self.name
 
 class Transition(object):
     def __init__(self, source, event, actions=None, targets=None):
@@ -85,6 +92,17 @@ class StateMachine(object):
         self.transitions = []
         self.classifiers = []
 
+    def __repr__(self):
+        text = "name = %s" % repr(self.name)
+        text += ", uname = %s" % repr(self.uname)
+        text += ", states = [%s]" % ', '.join([repr(s) for s in self.states])
+        text += ", events = [%s]" % ', '.join([repr(s) for s in self.events])
+        text += ", classifiers = [%s]" % ', '.join([repr(s) for s in self.classifiers])
+        text += ", transitions = [%s]" % ', '.join([repr(s) for s in self.transitions])
+        text += ", tests = [%s]" % ', '.join([repr(s) for s in self.tests])
+        text += ", actions = [%s]" % ', '.join([repr(s) for s in self.actions])
+        return '{ ' + text + ' }'
+
     def addEvent(self, event):
         assert isinstance(event, Event)
         if event not in self.events:
@@ -125,6 +143,18 @@ class StateMachine(object):
         assert test.tests[-1] in [s.name for s in self.states]
         self.tests.append(test)
 
+    def getEvent(self, name):
+        for e in self.events:
+            if e.name == name:
+                return e
+        return None
+
+    def getState(self, name):
+        for s in self.states:
+            if s.name == name:
+                return s
+        return None
+
     def printit(self):
         print "StateMachine:", self.name
         print "States:", ", ".join([repr(s) for s in self.states])
@@ -142,13 +172,42 @@ class StateMachine_Text(StateMachine):
     def __init__(self, other):
         StateMachine.__init__(self, other.name)
         if isinstance(other, StateMachine):
-            self.name = other.name
-            self.actions = other.actions
-            self.events = other.events
-            self.states = other.states
-            self.tests = other.tests
-            self.transitions = other.transitions
-            self.classifiers = other.classifiers
+            self.name = other.name[:]
+            self.actions = other.actions[:]
+            self.events = other.events[:]
+            self.states = other.states[:]
+            self.tests = other.tests[:]
+            self.transitions = other.transitions[:]
+            self.classifiers = other.classifiers[:]
+
+    def Inheritance(self):
+        base_states = {}
+        for derived in [state for state in self.states if len(state.base_list) > 0]:
+            for b in derived.base_list:
+                base_states[b] = None
+            replaced = [sc.event for sc in self.classifiers + self.transitions if sc.source == derived.name]
+            print "Derived:", derived, replaced
+            inherited = [sc for sc in self.classifiers + self.transitions if sc.source in derived.base_list]
+            print "Inherited:", derived, inherited
+            virtual = [i for i in inherited if i.event not in replaced]
+            print "Virtual:", derived, virtual
+            for item in virtual:
+                if isinstance(item, Classifier):
+                    self.addClassifier(Classifier(derived.name, item.event, item.actions, item.targets))
+                else:
+                    self.addTransition(Transition(derived.name, item.event, item.actions, item.targets))
+        target_states = {}
+        for s in self.transitions:
+            for t in s.targets:
+                target_states[t] = None
+        print "Targets:", target_states
+        ghosts = [s for s in self.transitions if s.source not in target_states]
+        print "Ghosts:", ghosts
+        print "Bases:", base_states
+        for s in ghosts:
+            if s.source in base_states:
+                self.transitions.remove(s)
+                print "Removed:", s
 
     def TextStateMachine(self):
         the_states = sorted([s.name for s in self.states])
@@ -157,7 +216,11 @@ class StateMachine_Text(StateMachine):
         txt += ['  STATES\n    %s;' % ',\n    '.join(the_states)]
         txt += ['  EVENTS\n    %s;' % ',\n    '.join(the_events)]
         for state in the_states:
-            txt += ['  State %s {' % state]
+            s = self.getState(state)
+            if s and len(s.base_list) > 0:
+                txt += ['  State %s (%s) {' % (state, ', '.join(s.base_list))]
+            else:
+                txt += ['  State %s {' % state]
             the_blocks = [b for b in self.classifiers if b.source == state]
             the_blocks += [b for b in self.transitions if b.source == state]
             for block in the_blocks:
@@ -191,6 +254,7 @@ class StateMachine_Text(StateMachine):
 class StateMachine_HTML(StateMachine_Text):
     def __init__(self, other):
         StateMachine_Text.__init__(self, other)
+        self.Inheritance()
 
     def StateTable1(self):
         the_states = sorted([s.name for s in self.states])
@@ -359,6 +423,7 @@ class StateMachine_HTML(StateMachine_Text):
 class StateMachine_Python(StateMachine_Text):
     def __init__(self, other):
         StateMachine_Text.__init__(self, other)
+        self.Inheritance()
 
     def Generate_Python(self):
         the_states = sorted([s.name for s in self.states])
@@ -481,6 +546,7 @@ class StateMachine_Python(StateMachine_Text):
 class StateMachine_TCL(StateMachine_Text):
     def __init__(self, other):
         StateMachine_Text.__init__(self, other)
+        self.Inheritance()
 
     def Generate_TCL(self):
         the_states = sorted([s.name for s in self.states])
@@ -598,6 +664,7 @@ class StateMachine_TCL(StateMachine_Text):
 class StateMachine_GCC(StateMachine_Text):
     def __init__(self, other):
         StateMachine_Text.__init__(self, other)
+        self.Inheritance()
         self.UseEnum = True
 
     def mkName(self, name):
