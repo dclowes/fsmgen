@@ -583,7 +583,8 @@ def process_source(source_file):
 
 def generate_source(the_fsm, SourceData, source_file):
     from xml.sax.saxutils import escape
-    dest_file = os.path.dirname(source_file) + the_fsm.name + ".fsm"
+    dest_file = os.path.join(os.path.dirname(source_file),\
+                             the_fsm.name + ".fsm")
     basename = os.path.basename(dest_file)
     # Generate the HTML
     fsm_text = statemachine.StateMachine_Text(the_fsm)
