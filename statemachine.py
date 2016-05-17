@@ -924,8 +924,12 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['    char *name;']
         txt += ['    int  index;']
         txt += ['};']
+        txt += ['enum {']
+        for item in stts:
+            txt += ['    e%s = %s,' % (self.mkState(item[0]), item[1])]
+        txt += ['};']
         txt += ['static const struct %s_t state_pointers [] = {' % self.mkState()]
-        txt += ['    { NULL, %s },' % len(stts)]
+        txt += ['    { NULL, %s },' % self.mkName('NUM_STATES')]
         for item in stts:
             txt += ['    { "%s", %d },'\
                     % (item[0], item[1])]
@@ -934,18 +938,18 @@ class StateMachine_GCC(StateMachine_Text):
         for item in stts:
             txt += ['const %s %s = &state_pointers[%d];'\
                     % (self.mkState(), self.mkState(item[0]), item[1])]
-        txt += ['enum {']
-        for item in stts:
-            txt += ['    e%s = %s,' % (self.mkState(item[0]), item[1])]
-        txt += ['};']
         # Events
         txt += ['', '/* Events */']
         txt += ['struct %s_t {' % self.mkEvent()]
         txt += ['    char *name;']
         txt += ['    int  index;']
         txt += ['};']
+        txt += ['enum {']
+        for item in evts:
+            txt += ['    e%s = %s,' % (self.mkEvent(item[0]), item[1])]
+        txt += ['};']
         txt += ['static const struct %s_t event_pointers [] = {' % self.mkEvent()]
-        txt += ['    { NULL, %s },' % len(evts)]
+        txt += ['    { NULL, %s },' % self.mkName('NUM_EVENTS')]
         for item in evts:
             txt += ['    { "%s", %d },'\
                     % (item[0], item[1])]
@@ -954,18 +958,18 @@ class StateMachine_GCC(StateMachine_Text):
         for item in evts:
             txt += ['const %s %s = &event_pointers[%d];'\
                     % (self.mkEvent(), self.mkEvent(item[0]), item[1])]
-        txt += ['enum {']
-        for item in evts:
-            txt += ['    e%s = %s,' % (self.mkEvent(item[0]), item[1])]
-        txt += ['};']
         # Actions
         txt += ['', '/* Actions */']
         txt += ['struct %s_t {' % self.mkAction()]
         txt += ['    char *name;']
         txt += ['    int  index;']
         txt += ['};']
+        txt += ['enum {']
+        for item in acts:
+            txt += ['    e%s = %s,' % (self.mkAction(item[0]), item[1])]
+        txt += ['};']
         txt += ['static const struct %s_t action_pointers [] = {' % self.mkAction()]
-        txt += ['    { NULL, %s },' % len(evts)]
+        txt += ['    { NULL, %s },' % self.mkName('NUM_ACTIONS')]
         for item in acts:
             txt += ['    { "%s", %d },'\
                     % (item[0], item[1])]
@@ -974,10 +978,6 @@ class StateMachine_GCC(StateMachine_Text):
         for item in acts:
             txt += ['const %s %s = &action_pointers[%d];'\
                     % (self.mkAction(), self.mkAction(item[0]), item[1])]
-        txt += ['enum {']
-        for item in acts:
-            txt += ['    e%s = %s,' % (self.mkAction(item[0]), item[1])]
-        txt += ['};']
         #
         txt += ['']
         txt += ['typedef struct fsmTransTab_t fsmTransTab;']
@@ -1003,11 +1003,11 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['    };']
         txt += ['};']
         # Generate the Transition Tables
-        act_txt = ['/* TODO: describe the action_table */']
+        act_txt = ['/* TODO: the action_table has sequences of actions per transition */']
         act_txt += ['static const struct %s_t * const action_table[] = {' % self.mkAction()]
-        evt_txt = ['/* TODO: describe the event_table */']
+        evt_txt = ['/* TODO: the event_table has sequences of events per classifier */']
         evt_txt += ['static const struct %s_t * event_table[] = {' % self.mkEvent()]
-        map_txt = ['/* TODO: describe the map_table */']
+        map_txt = ['/* TODO: the map_table has indexes into trans_table per state */']
         map_txt += ['static int map_table[] = {', '    0,']
         tab_txt = ['/* TODO: describe the transition_table */']
         tab_txt += ['static fsmTransTab trans_table[] = {']
@@ -1018,39 +1018,38 @@ class StateMachine_GCC(StateMachine_Text):
             map_txt += ['    %d, /* %s */' % (tab_idx, state)]
             for event in the_events:
                 for block in the_blocks:
-                    if block.source == state:
-                        if block.event == event:
-                            act_cnt = len(block.actions)
-                            for item in block.actions:
-                                act_txt += ['    &action_pointers[e%s],' % self.mkAction(item)]
-                            target = state
-                            if isinstance(block, Transition) and len(block.targets) > 0:
-                                target = block.targets[0]
-                            line = ''
-                            line += '    { /* %d */\n' % (tab_idx)
-                            line += '        .si=&state_pointers[e%s],\n' % (self.mkState(state))
-                            line += '        .ei=&event_pointers[e%s],\n' % (self.mkEvent(event))
-                            if isinstance(block, Transition):
-                                line += '        .ac_type=fsmActionTrans,\n'
-                                line += '        .so=&state_pointers[e%s],\n' % self.mkState(target)
-                                line += '        .ac_start=%d,\n' % act_idx
-                                line += '        .ac_count=%d,\n' % act_cnt
-                            else:
-                                evt_cnt = len(block.targets)
-                                for item in block.targets:
-                                    evt_txt += ['    &event_pointers[e%s],' % self.mkEvent(item[0])]
-                                line += '        .ac_type=fsmActionClass,\n'
-                                line += '        .ac_class=e%s,\n' % self.mkAction(block.actions[0])
-                                line += '        .ev_start=%d,\n' % evt_idx
-                                evt_idx += evt_cnt
-                                line += '        .ev_count=%s,\n' % evt_cnt
-                                for action in block.actions:
-                                    if action not in classifier_list:
-                                        classifier_list[action] = block.targets[0]
-                            line += '    },'
-                            tab_txt += [line]
-                            tab_idx += 1
-                            act_idx += act_cnt
+                    if block.source == state and block.event == event:
+                        act_cnt = len(block.actions)
+                        for item in block.actions:
+                            act_txt += ['    &action_pointers[e%s],' % self.mkAction(item)]
+                        target = state
+                        if isinstance(block, Transition) and len(block.targets) > 0:
+                            target = block.targets[0]
+                        line = ''
+                        line += '    { /* %d */\n' % (tab_idx)
+                        line += '        .si=&state_pointers[e%s],\n' % (self.mkState(state))
+                        line += '        .ei=&event_pointers[e%s],\n' % (self.mkEvent(event))
+                        if isinstance(block, Transition):
+                            line += '        .ac_type=fsmActionTrans,\n'
+                            line += '        .so=&state_pointers[e%s],\n' % self.mkState(target)
+                            line += '        .ac_start=%d,\n' % act_idx
+                            line += '        .ac_count=%d,\n' % act_cnt
+                        else:
+                            evt_cnt = len(block.targets)
+                            for item in block.targets:
+                                evt_txt += ['    &event_pointers[e%s],' % self.mkEvent(item[0])]
+                            line += '        .ac_type=fsmActionClass,\n'
+                            line += '        .ac_class=e%s,\n' % self.mkAction(block.actions[0])
+                            line += '        .ev_start=%d,\n' % evt_idx
+                            evt_idx += evt_cnt
+                            line += '        .ev_count=%s,\n' % evt_cnt
+                            for action in block.actions:
+                                if action not in classifier_list:
+                                    classifier_list[action] = block.targets[0]
+                        line += '    },'
+                        tab_txt += [line]
+                        tab_idx += 1
+                        act_idx += act_cnt
         act_txt += ['};', '']
         evt_txt += ['};', '']
         map_txt += ['    %d' % tab_idx]
@@ -1133,10 +1132,10 @@ class StateMachine_GCC(StateMachine_Text):
             txt += ['{']
             if action in classifier_list:
                 next_event = classifier_list[action][0]
-                txt += ['    printf("State: %%-20s, Event: %%-20s, Action: %-20s, NextEvent: %s\\n", state->name, event->name);' % (action, next_event)]
+                txt += ['    printf("State: %%-20s, Event: %%-20s, Classifier: %-20s, NextEvent: %s\\n", state->name, event->name);' % (action, next_event)]
                 txt += ['    return %s;' % self.mkEvent(next_event)]
             else:
-                txt += ['    printf("State: %%-20s, Event: %%-20s, Action: %-20s\\n", state->name, event->name);' % action]
+                txt += ['    printf("State: %%-20s, Event: %%-20s, ActionFunc: %-20s\\n", state->name, event->name);' % action]
                 txt += ['    return NULL;']
             txt += ['}', '']
         txt += ['static void register_%s_actions(void) {' % (self.name)]
