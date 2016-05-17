@@ -665,72 +665,38 @@ class StateMachine_GCC(StateMachine_Text):
     def __init__(self, other):
         StateMachine_Text.__init__(self, other)
         self.Inheritance()
+        self.prefix = 'FSM_'
+        self.prefix = ''
 
     def mkFunc(self, name=None):
         if name:
-            return  'FSM_%s_%s' % (self.uname, name)
-        return 'FSM_%s' % (self.uname)
+            return  self.prefix + '%s_%s' % (self.uname, name)
+        return self.prefix + '%s' % (self.uname)
 
     def mkName(self, name=None):
         if name:
-            return  'FSM_%s_%s' % (self.uname, name)
-        return 'FSM_%s' % (self.uname)
+            return  self.prefix + '%s_%s' % (self.uname, name)
+        return self.prefix + '%s' % (self.uname)
 
     def mkState(self, name=None):
         if name:
-            return  'FSM_%s_STATE_%s' % (self.uname, name)
-        return  'FSM_%s_STATE' % (self.uname)
+            return  self.prefix + '%s_STATE_%s' % (self.uname, name)
+        return  self.prefix + '%s_STATE' % (self.uname)
 
     def mkEvent(self, name=None):
         if name:
-            return  'FSM_%s_EVENT_%s' % (self.uname, name)
-        return  'FSM_%s_EVENT' % (self.uname)
+            return  self.prefix + '%s_EVENT_%s' % (self.uname, name)
+        return  self.prefix + '%s_EVENT' % (self.uname)
 
     def mkAction(self, name=None):
         if name:
-            return  'FSM_%s_ACTION_%s' % (self.uname, name)
-        return  'FSM_%s_ACTION' % (self.uname)
+            return  self.prefix + '%s_ACTION_%s' % (self.uname, name)
+        return  self.prefix + '%s_ACTION' % (self.uname)
 
-    def Generate_C(self):
-        the_states = sorted([s.name for s in self.states])
-        the_events = sorted([e.name for e in self.events])
-        the_actions = []
-        classifier_list = {}
-        the_blocks = [b for b in self.classifiers + self.transitions]
-        max_actions = 0
-        for block in the_blocks:
-            if len(block.actions) > max_actions:
-                max_actions = len(block.actions)
-            for action in block.actions:
-                if action not in the_actions:
-                    the_actions.append(action)
-        the_actions = sorted(the_actions)
-        uname = self.name.upper()
-        hdr = ['#ifndef %s_H' % uname]
-        hdr += ['#define %s_H' % uname]
-        #hdr += ['#include "statemachine.h"', '']
-        tkns = []
-        tkns += [('NUM_STATES', len(the_states))]
-        tkns += [('NUM_EVENTS', len(the_events))]
-        tkns += [('NUM_TRANS', len(the_blocks))]
-        tkns += [('NUM_ACTIONS', len(the_actions))]
-        tkns += [('MAX_ACTIONS', max_actions)]
-        stts = []
-        for idx, state in enumerate(the_states):
-            stts += [(state, idx + 1)]
-        evts = []
-        for idx, event in enumerate(the_events):
-            evts += [(event, idx + 1)]
-        acts = []
-        for idx, action in enumerate(the_actions):
-            acts += [(action, idx + 1)]
-        print "tkns:", tkns
-        print "stts:", stts
-        print "evts:", evts
-        print "acts:", acts
-        for item in tkns:
-            hdr += ['#define %s %d'\
-                    % (self.mkName(item[0]), item[1])]
+    def Generate_Hdr(self, stts, evts, acts):
+        hdr = []
+        hdr += ['#ifndef %s_H' % self.uname]
+        hdr += ['#define %s_H' % self.uname]
         # States
         hdr += ['', '/* States */']
         hdr += ['typedef const struct %s_t *%s;'\
@@ -752,49 +718,206 @@ class StateMachine_GCC(StateMachine_Text):
         for item in acts:
             hdr += ['extern  const %s %s;'\
                     % (self.mkAction(), self.mkAction(item[0]))]
-        # Epilog
-        hdr += ['', '/* Epilog */']
-        hdr += ['typedef struct %s_t *%s; /* instance */'\
+        # Instance
+        hdr += ['', '/* Statemachine Instance */']
+        hdr += ['typedef struct %s_t *%s;'\
                 % (self.mkName(), self.mkName())]
+        # Functions
+        hdr += ['', '/* Statemachine Functions */']
+        hdr += ['', '/* User Supplied Action/Classifier Functions */']
         hdr += ['typedef %s (*%s)('\
-                % (self.mkState(), self.mkFunc('Action'))]
+                % (self.mkEvent(), self.mkFunc('Action'))]
         hdr += ['    %s smi,' % self.mkName()]
         hdr += ['    %s state, ' % self.mkState()]
         hdr += ['    %s event);' % self.mkEvent()]
-        hdr += ['typedef %s (*%s)('\
-                % (self.mkEvent(), self.mkFunc('Classify'))]
-        hdr += ['    %s smi,' % self.mkName()]
-        hdr += ['    %s state, ' % self.mkState()]
-        hdr += ['    %s event);' % self.mkEvent()]
-        hdr += ['%s %s(%s initial);'\
-                % (self.mkName(), self.mkFunc('Make'), self.mkEvent())]
-        hdr += ['void %s(%s smi);' % (self.mkName('Kill'), self.mkFunc())]
+        # Constructor
+        hdr += ['', '/* Statemachine Instance Constructor */']
+        hdr += ['%s %s(const char *name, %s initial);'\
+                % (self.mkName(), self.mkFunc('InstanceMake'), self.mkState())]
+        hdr += ['', '/* Statemachine Instance Destructor */']
+        hdr += ['void %s(%s smi);' % (self.mkName('InstanceKill'), self.mkFunc())]
+        hdr += ['', '/* Statemachine Instance Driver */']
         hdr += ['void %s(%s smi,'\
-                % (self.mkFunc('Run'), self.mkName())]
+                % (self.mkFunc('InstanceRun'), self.mkName())]
         hdr += ['    %s ev);'\
                 % (self.mkEvent())]
-        hdr += ['void %s(%s smi,'\
-                % (self.mkFunc('SetAction'), self.mkName())]
+        #
+        hdr += ['', '/* Statemachine Class Action Setter */']
+        hdr += ['void %s('\
+                % (self.mkFunc('ClassSetAction'))]
         hdr += ['    %s action,'\
                 % (self.mkAction())]
         hdr += ['    %s af);'\
                 % (self.mkFunc('Action'))]
+        hdr += ['', '/* Statemachine Instance Action Setter */']
         hdr += ['void %s(%s smi,'\
-                % (self.mkFunc('SetClassify'), self.mkName())]
+                % (self.mkFunc('InstanceSetAction'), self.mkName())]
         hdr += ['    %s action,'\
                 % (self.mkAction())]
         hdr += ['    %s af);'\
-                % (self.mkFunc('Classify'))]
+                % (self.mkFunc('Action'))]
         #hdr += ['extern fsmStateMachine fsm_%s;' % self.name]
-        hdr += ['', '#endif /* %s_H */' % uname]
+        hdr += ['', '#endif /* %s_H */' % self.uname]
+        return hdr
+
+    def Generate_Code(self):
+        txt = []
+        txt += ['/* Create an Instance of this Statemachine */']
+        txt += ['%s %s(const char *name, %s initial)'\
+                % (self.mkName(), self.mkFunc('InstanceMake'), self.mkState())]
+        txt += ['{']
+        txt += ['    %s smi = (%s) calloc(1, sizeof(struct %s_t));'\
+                % (self.mkName(), self.mkName(), self.mkName())]
+        txt += ['    if (smi == NULL)']
+        txt += ['        return NULL;']
+        txt += ['    /* TODO initialisation */']
+        txt += ['    smi->name = strdup(name);']
+        txt += ['    smi->fsm = &fsm_%s;' % self.name]
+        txt += ['    smi->actionTab = (%s *) calloc(%s, sizeof(%s));'\
+                % (self.mkFunc('Action'), self.mkName('NUM_ACTIONS'), self.mkFunc('Action'))]
+        txt += ['    smi->currentState = initial;']
+        txt += ['    return smi;']
+        txt += ['}']
+        txt += ['']
+        txt += ['/* Destroy an Instance of this Statemachine */']
+        txt += ['void %s(%s smi)' % (self.mkFunc('InstanceKill'), self.mkName())]
+        txt += ['{']
+        txt += ['    if (smi == NULL)']
+        txt += ['        return;']
+        txt += ['    free(smi->name);']
+        txt += ['    free(smi->actionTab);']
+        txt += ['    free(smi);']
+        txt += ['}']
+        txt += ['']
+        txt += ['/* Run one Event for this Instance of this Statemachine */']
+        txt += ['%s %s(%s smi, %s ev)'\
+                % (self.mkState(), self.mkFunc('RunStateEvent'), self.mkName(), self.mkEvent())]
+        txt += ['{']
+        txt += ['    int i, j, k;']
+        txt += ['    %s next_event = NULL;' % self.mkEvent()]
+        txt += ['    %s next_state = smi->currentState;' % self.mkState()]
+        txt += ['    const fsmStateMachine *fsm = smi->fsm;']
+        txt += ['    int s_beg = fsm->mapTab[smi->currentState->index];']
+        txt += ['    int s_end = fsm->mapTab[smi->currentState->index + 1];']
+        txt += ['    do {']
+        txt += ['        next_event = NULL;']
+        txt += ['        if (ev == NULL) {']
+        txt += ['            return next_state;']
+        txt += ['        }']
+        txt += ['        for (i = s_beg; i < s_end; ++i) {']
+        txt += ['            if (fsm->transTab[i].ei == ev) {']
+        txt += ['                fsmTransTab *tab = &fsm->transTab[i];']
+        txt += ['                fsmActionType actionType = tab->ac_type;']
+        txt += ['                %s fn;' % self.mkFunc('Action')]
+        txt += ['                switch (actionType) {']
+        txt += ['                    case fsmActionClass:']
+        txt += ['                        k = tab->ac_class;']
+        txt += ['                        fn = fsm->actionTab[k];']
+        txt += ['                        if (smi->actionTab && smi->actionTab[k])']
+        txt += ['                            fn = smi->actionTab[k];']
+        txt += ['                        next_event = (*fn)(smi, smi->currentState, ev);']
+        txt += ['                        ev = next_event;']
+        txt += ['                        break;']
+        txt += ['                    case fsmActionTrans:']
+        txt += ['                        if (tab->so)']
+        txt += ['                            next_state = tab->so;']
+        txt += ['                        for (j = 0; j < tab->ac_count; ++ j) {']
+        txt += ['                            k = fsm->actTab[tab->ac_start + j]->index;']
+        txt += ['                            fn = fsm->actionTab[k];']
+        txt += ['                            if (smi->actionTab && smi->actionTab[k])']
+        txt += ['                                fn = smi->actionTab[k];']
+        txt += ['                            (void) (*fn)(smi, smi->currentState, ev);']
+        txt += ['                        }']
+        txt += ['                        break;']
+        txt += ['                }']
+        txt += ['                break;']
+        txt += ['            }']
+        txt += ['        }']
+        txt += ['    } while (next_event);']
+        txt += ['    return next_state;']
+        txt += ['}']
+        txt += ['']
+        txt += ['void %s(%s smi, %s ev)'\
+                % (self.mkFunc('InstanceRun'), self.mkName(), self.mkEvent())]
+        txt += ['{']
+        txt += ['    %s next_state = %s(smi, ev);'\
+                % (self.mkState(), self.mkFunc('RunStateEvent'))]
+        txt += ['    if (next_state != smi->currentState) {']
+        txt += ['        if (smi->fsm->exitEvent)']
+        txt += ['            %s(smi, smi->fsm->exitEvent);'\
+                % self.mkFunc('RunStateEvent')]
+        txt += ['        smi->currentState = next_state;']
+        txt += ['        if (smi->fsm->entryEvent)']
+        txt += ['            %s(smi, smi->fsm->entryEvent);'\
+                % self.mkFunc('RunStateEvent')]
+        txt += ['    }']
+        txt += ['}']
+        txt += ['']
+        txt += ['void %s(' % self.mkFunc('ClassSetAction')]
+        txt += ['        %s action,' % self.mkAction()]
+        txt += ['        %s func)' % self.mkFunc('Action')]
+        txt += ['{']
+        txt += ['    if (action->index > 0 && action->index <= %s)'\
+                % self.mkName('NUM_ACTIONS')]
+        txt += ['        action_funcs[action->index] = func;']
+        txt += ['}']
+        txt += ['']
+        txt += ['void %s(' % self.mkFunc('InstanceSetAction')]
+        txt += ['        %s smi,' % self.mkName()]
+        txt += ['        %s action,' % self.mkAction()]
+        txt += ['        %s func)' % self.mkFunc('Action')]
+        txt += ['{']
+        txt += ['    if (action->index > 0 && action->index <= %s)'\
+                % self.mkName('NUM_ACTIONS')]
+        txt += ['        smi->actionTab[action->index] = func;']
+        txt += ['}']
+        return txt
+
+    def Generate_C(self):
+        the_states = sorted([s.name for s in self.states])
+        the_events = sorted([e.name for e in self.events])
+        the_actions = []
+        classifier_list = {}
+        the_blocks = [b for b in self.classifiers + self.transitions]
+        max_actions = 0
+        for block in the_blocks:
+            if len(block.actions) > max_actions:
+                max_actions = len(block.actions)
+            for action in block.actions:
+                if action not in the_actions:
+                    the_actions.append(action)
+        the_actions = sorted(the_actions)
+        tkns = []
+        tkns += [('NUM_STATES', len(the_states))]
+        tkns += [('NUM_EVENTS', len(the_events))]
+        tkns += [('NUM_TRANS', len(the_blocks))]
+        tkns += [('NUM_ACTIONS', len(the_actions))]
+        tkns += [('MAX_ACTIONS', max_actions)]
+        stts = []
+        for idx, state in enumerate(the_states):
+            stts += [(state, idx + 1)]
+        evts = []
+        for idx, event in enumerate(the_events):
+            evts += [(event, idx + 1)]
+        acts = []
+        for idx, action in enumerate(the_actions):
+            acts += [(action, idx + 1)]
+        print "tkns:", tkns
+        print "stts:", stts
+        print "evts:", evts
+        print "acts:", acts
+
+        hdr = self.Generate_Hdr(stts, evts, acts)
 
         txt = []
         txt += ['#include <stdlib.h>']
         txt += ['#include <stdio.h>']
+        txt += ['#include <string.h>']
         txt += ['']
-        tab_idx = 0
-        act_idx = 0
-        evt_idx = 0
+        for item in tkns:
+            txt += ['#define %s %d'\
+                    % (self.mkName(item[0]), item[1])]
+        txt += ['']
         # States
         txt += ['', '/* States */']
         txt += ['struct %s_t {' % self.mkState()]
@@ -857,36 +980,40 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['};']
         #
         txt += ['']
+        txt += ['typedef struct fsmTransTab_t fsmTransTab;']
+        txt += ['typedef enum {']
+        txt += ['    fsmActionClass = 1, /* Classifier Action Entry */']
+        txt += ['    fsmActionTrans = 2  /* Transition Action Entry */']
+        txt += ['} fsmActionType;']
+        txt += ['struct fsmTransTab_t {']
+        txt += ['    %s si; /* Input State */' % self.mkState()]
+        txt += ['    %s ei; /* Input Event */' % self.mkEvent()]
+        txt += ['    fsmActionType ac_type; /* Classifier or Transition */']
+        txt += ['    union {']
+        txt += ['        struct { /* Classifier Action Entry */']
+        txt += ['            int ac_class; /* Action Classifier */']
+        txt += ['            int ev_start; /* First output Event */']
+        txt += ['            int ev_count; /* Number of candidates */']
+        txt += ['        };']
+        txt += ['        struct { /* Transition Action Entry */']
+        txt += ['            %s so;        /* Output State */' % self.mkState()]
+        txt += ['            int ac_start; /* First Action */']
+        txt += ['            int ac_count; /* Number of Actions */']
+        txt += ['        };']
+        txt += ['    };']
+        txt += ['};']
+        # Generate the Transition Tables
         act_txt = ['/* TODO: describe the action_table */']
         act_txt += ['static const struct %s_t * const action_table[] = {' % self.mkAction()]
         evt_txt = ['/* TODO: describe the event_table */']
         evt_txt += ['static const struct %s_t * event_table[] = {' % self.mkEvent()]
         map_txt = ['/* TODO: describe the map_table */']
         map_txt += ['static int map_table[] = {', '    0,']
-        tab_txt = ['/* TODO: describe the tab_table */']
-        tab_txt += ['typedef struct fsmTransTab_t fsmTransTab;']
-        tab_txt += ['typedef enum {']
-        tab_txt += ['    fsmActionClass = 1, /* Classifier Action Entry */']
-        tab_txt += ['    fsmActionTrans = 2  /* Transition Action Entry */']
-        tab_txt += ['} fsmActionType;']
-        tab_txt += ['struct fsmTransTab_t {']
-        tab_txt += ['    %s si; /* Input State */' % self.mkState()]
-        tab_txt += ['    %s ei; /* Input Event */' % self.mkEvent()]
-        tab_txt += ['    fsmActionType ac_type; /* Classifier or Transition */']
-        tab_txt += ['    union {']
-        tab_txt += ['        struct { /* Classifier Action Entry */']
-        tab_txt += ['            int ac_class; /* Action Classifier */']
-        tab_txt += ['            int ev_start; /* First output Event */']
-        tab_txt += ['            int ev_count; /* Number of candidates */']
-        tab_txt += ['        };']
-        tab_txt += ['        struct { /* Transition Action Entry */']
-        tab_txt += ['            %s so;        /* Output State */' % self.mkState()]
-        tab_txt += ['            int ac_start; /* First Action */']
-        tab_txt += ['            int ac_count; /* Number of Actions */']
-        tab_txt += ['        };']
-        tab_txt += ['    };']
-        tab_txt += ['};']
+        tab_txt = ['/* TODO: describe the transition_table */']
         tab_txt += ['static fsmTransTab trans_table[] = {']
+        act_idx = 0
+        evt_idx = 0
+        tab_idx = 0
         for state in the_states:
             map_txt += ['    %d, /* %s */' % (tab_idx, state)]
             for event in the_events:
@@ -948,19 +1075,45 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['    0', '};', '']
         txt += ['']
         txt += ['static %s action_funcs[%s+1];' % (self.mkFunc('Action'), self.mkName('NUM_ACTIONS'))]
-        txt += ['static %s classifier_funcs[%s+1];' % (self.mkFunc('Classify'), self.mkName('NUM_ACTIONS'))]
-        txt += ['']
-        txt += ['fsmStateMachine fsm_%s = {' % self.name]
+        txt += ['', '/* State Machine Class */']
+        txt += ['typedef struct fsmStateMachine_t fsmStateMachine;']
+        txt += ['struct fsmStateMachine_t {']
+        txt += ['    char *name;']
+        txt += ['    int numStates;']
+        txt += ['    int numEvents;']
+        txt += ['    int numTrans;']
+        txt += ['    int numActions;']
+        txt += ['    int maxActions;']
+        txt += ['    %s entryEvent;' % self.mkEvent()]
+        txt += ['    %s exitEvent;' % self.mkEvent()]
+        txt += ['    int *mapTab;']
+        txt += ['    const %s * actTab;' % self.mkAction()]
+        txt += ['    const %s * evtTab;' % self.mkEvent()]
+        txt += ['    char **stateNames;']
+        txt += ['    char **eventNames;']
+        txt += ['    char **actionNames;']
+        txt += ['    fsmTransTab *transTab;']
+        txt += ['    %s *actionTab; /* Class Actions */' % self.mkFunc('Action')]
+        txt += ['};']
+        txt += ['', '/* State Machine Instance */']
+        txt += ['struct %s_t {' % self.mkName()]
+        txt += ['    char *name;']
+        txt += ['    const fsmStateMachine *fsm;']
+        txt += ['    %s *actionTab; /* Instance Actions */' % self.mkFunc('Action')]
+        txt += ['    %s currentState;' % self.mkState()]
+        txt += ['    void *priv; /* private */']
+        txt += ['    void (*killPriv)(void*);']
+        txt += ['};']
+        txt += ['', '/* State Machine Initializer */']
+        txt += ['static const fsmStateMachine fsm_%s = {' % self.name]
         txt += ['    .name="%s",' % self.name]
         txt += ['    .numStates=%s,' % self.mkName('NUM_STATES')]
         txt += ['    .numEvents=%s,' % self.mkName('NUM_EVENTS')]
         txt += ['    .numTrans=%s,' % self.mkName('NUM_TRANS')]
         txt += ['    .numActions=%s,' % self.mkName('NUM_ACTIONS')]
         txt += ['    .maxActions=%s,' % self.mkName('MAX_ACTIONS')]
-        if 'Entry' in the_events:
-            txt += ['    .entryEvent=%s,' % (self.mkEvent('Entry'))]
-        if 'Exit' in the_events:
-            txt += ['    .exitEvent=%s,' % (self.mkEvent('Exit'))]
+        txt += ['    .entryEvent=&event_pointers[e%s],' % (self.mkEvent('Entry'))]
+        txt += ['    .exitEvent=&event_pointers[e%s],' % (self.mkEvent('Exit'))]
         txt += ['    .mapTab=map_table,']
         txt += ['    .actTab=action_table,']
         txt += ['    .evtTab=event_table,']
@@ -970,47 +1123,52 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['    .transTab=trans_table,']
         txt += ['    .actionTab=action_funcs']
         txt += ['};', '']
-        txt += ['#ifdef UNIT_TEST']
+        txt += self.Generate_Code()
+        txt += ['', '#ifdef UNIT_TEST']
         for action in the_actions:
-            txt += ['static int %s_test(fsmInstance *smi, fsmState state, fsmEvent event) {' %action]
+            txt += ['static %s %s_test(' % (self.mkEvent(), self.mkAction(action))]
+            txt += ['        %s smi,' % self.mkName()]
+            txt += ['        %s state,' % self.mkState()]
+            txt += ['        %s event)' % self.mkEvent()]
+            txt += ['{']
             if action in classifier_list:
                 next_event = classifier_list[action][0]
-                txt += ['    printf("State: %%-20s, Event: %%-20s, Action: %-20s, NextEvent: %s\\n", smi->fsm->stateNames[state], smi->fsm->eventNames[event]);' % (action, next_event)]
+                txt += ['    printf("State: %%-20s, Event: %%-20s, Action: %-20s, NextEvent: %s\\n", state->name, event->name);' % (action, next_event)]
                 txt += ['    return %s;' % self.mkEvent(next_event)]
             else:
-                txt += ['    printf("State: %%-20s, Event: %%-20s, Action: %-20s\\n", smi->fsm->stateNames[state], smi->fsm->eventNames[event]);' % action]
-                txt += ['    return 0;']
+                txt += ['    printf("State: %%-20s, Event: %%-20s, Action: %-20s\\n", state->name, event->name);' % action]
+                txt += ['    return NULL;']
             txt += ['}', '']
         txt += ['static void register_%s_actions(void) {' % (self.name)]
-        txt += ['    fsmStateMachine *fsm = &fsm_%s;' % (self.name)]
         for action in the_actions:
-            txt += ['    fsmSetActionFunction(fsm, %s, %s_test);' % (self.mkAction(action), action)]
+            txt += ['    %s(%s, %s_test);'\
+                    % (self.mkFunc('ClassSetAction'), self.mkAction(action), self.mkAction(action))]
         txt += ['};', '']
         txt += ['static void test_%s_actions(void) {' % (self.name)]
-        txt += ['    fsmStateMachine *fsm = &fsm_%s;' % (self.name)]
-        txt += ['    fsmInstance smi = { .name="test", .fsm=fsm };']
-        txt += ['    fsmState state;']
-        txt += ['    fsmEvent event;']
+        txt += ['    %s smi;' % (self.mkName())]
+        txt += ['    int state;']
+        txt += ['    int event;']
         txt += ['    int idx;']
         txt += ['    register_%s_actions();' % (self.name), '']
-        txt += ['    for (state = 1; state <= fsm->numStates; ++state)']
-        txt += ['        for (event = 1; event <= fsm->numEvents; ++event)']
-        txt += ['            for (idx = 0; idx < fsm->numTrans; ++idx) {']
-        txt += ['                fsmTransTab *tab = &fsm->transTab[idx];']
-        txt += ['                if (tab->si == state && tab->ei == event) {']
-        txt += ['                    smi.currentState = state;']
-        txt += ['                    fsmRunStateMachine(&smi, event);']
-        txt += ['                    if (smi.currentState != state)']
-        txt += ['                        printf("       %s ===> %s\\n", fsm->stateNames[state], fsm->stateNames[smi.currentState]);']
+        txt += ['    smi = %s("test", %s);' % (self.mkFunc('InstanceMake'), self.mkState(the_states[0]))]
+        txt += ['    for (state = 1; state <= %s; ++state)' % self.mkName('NUM_STATES')]
+        txt += ['        for (event = 1; event <= %s; ++event)' % self.mkName('NUM_EVENTS')]
+        txt += ['            for (idx = 0; idx < %s; ++idx) {' % self.mkName('NUM_TRANS')]
+        txt += ['                fsmTransTab *tab = &trans_table[idx];']
+        txt += ['                if (tab->si->index == state && tab->ei->index == event) {']
+        txt += ['                    smi->currentState = &state_pointers[state];']
+        txt += ['                    %s(smi, &event_pointers[event]);' % self.mkFunc('InstanceRun')]
+        txt += ['                    if (smi->currentState->index != state)']
+        txt += ['                        printf("       %s ===> %s\\n", state_names[state], smi->currentState->name);']
         txt += ['                }']
         txt += ['            }']
         for test in self.tests:
             print "Test::", test
             txt += ['    do {']
-            txt += ['        smi.currentState = %s;' % test.tests[0]]
+            txt += ['        smi->currentState = %s;' % test.tests[0]]
             for t in test.tests:
                 if t in the_states:
-                    txt += ['        if (smi.currentState != %s) {' % t]
+                    txt += ['        if (smi->currentState != %s) {' % t]
                     txt += ['            printf("State is %%s but expected %s\\n", fsm->stateNames[smi.currentState]);' % t]
                     txt += ['            break;']
                     txt += ['        }']
@@ -1018,9 +1176,15 @@ class StateMachine_GCC(StateMachine_Text):
                     txt += ['        fsmRunStateMachine(&smi, %s);' % t]
             txt += ['        printf("Test Passed: %s\\n");' % repr(test)]
             txt += ['    } while (0);']
+        txt += ['    %s(smi);' % (self.mkFunc('InstanceKill'))]
         txt += ['};', '']
+        txt += ['static void fsmPrintStateMachine(void)']
+        txt += ['{']
+        txt += ['']
+        txt += ['}']
+        txt += ['']
         txt += ['int main(int argc, char *argv[]) {']
-        txt += ['    fsmPrintStateMachine(&fsm_%s);' % (self.name)]
+        txt += ['    fsmPrintStateMachine();']
         txt += ['    test_%s_actions();' % (self.name)]
         txt += ['};', '']
         txt += ['#endif /* UNIT_TEST */']
