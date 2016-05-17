@@ -665,31 +665,31 @@ class StateMachine_GCC(StateMachine_Text):
     def __init__(self, other):
         StateMachine_Text.__init__(self, other)
         self.Inheritance()
-        self.UseEnum = True
 
-    def mkName(self, name):
-        if self.UseEnum:
-            return '%s_%s' % (self.uname, name)
-        else:
-            return  'FSM_%s.%s' % (self.uname, name)
+    def mkFunc(self, name=None):
+        if name:
+            return  'FSM_%s_%s' % (self.uname, name)
+        return 'FSM_%s' % (self.uname)
 
-    def mkState(self, name):
-        if self.UseEnum:
-            return '%s_%s' % (self.uname, name)
-        else:
-            return  'FSM_%s.%s' % (self.uname, name)
+    def mkName(self, name=None):
+        if name:
+            return  'FSM_%s_%s' % (self.uname, name)
+        return 'FSM_%s' % (self.uname)
 
-    def mkEvent(self, name):
-        if self.UseEnum:
-            return '%s_%s' % (self.uname, name)
-        else:
-            return  'FSM_%s.%s' % (self.uname, name)
+    def mkState(self, name=None):
+        if name:
+            return  'FSM_%s_STATE_%s' % (self.uname, name)
+        return  'FSM_%s_STATE' % (self.uname)
 
-    def mkAction(self, name):
-        if self.UseEnum:
-            return '%s_%s' % (self.uname, name)
-        else:
-            return  'FSM_%s.%s' % (self.uname, name)
+    def mkEvent(self, name=None):
+        if name:
+            return  'FSM_%s_EVENT_%s' % (self.uname, name)
+        return  'FSM_%s_EVENT' % (self.uname)
+
+    def mkAction(self, name=None):
+        if name:
+            return  'FSM_%s_ACTION_%s' % (self.uname, name)
+        return  'FSM_%s_ACTION' % (self.uname)
 
     def Generate_C(self):
         the_states = sorted([s.name for s in self.states])
@@ -708,107 +708,212 @@ class StateMachine_GCC(StateMachine_Text):
         uname = self.name.upper()
         hdr = ['#ifndef %s_H' % uname]
         hdr += ['#define %s_H' % uname]
-        hdr += ['#include "statemachine.h"']
-        if self.UseEnum == True:
-            hdr += ['#define %s %d' % (self.mkName('NUM_STATES'), len(the_states))]
-            hdr += ['#define %s %d' % (self.mkName('NUM_EVENTS'), len(the_events))]
-            hdr += ['#define %s %d' % (self.mkName('NUM_TRANS'), len(the_blocks))]
-            hdr += ['#define %s %d' % (self.mkName('NUM_ACTIONS'), len(the_actions))]
-            hdr += ['#define %s %d' % (self.mkName('MAX_ACTIONS'), max_actions)]
-            hdr += ['enum %s_STATES {' % uname]
-            for idx, state in enumerate(the_states):
-                hdr += ['    %s = %d,' % (self.mkState(state), idx + 1)]
-            hdr += ['};']
-            hdr += ['enum %s_EVENTS {' % uname]
-            for idx, event in enumerate(the_events):
-                hdr += ['    %s = %d,' % (self.mkEvent(event), idx + 1)]
-            hdr += ['};', '']
-            hdr += ['enum %s_ACTIONS {' % uname]
-            for idx, action in enumerate(the_actions):
-                hdr += ['    %s = %d,' % (self.mkEvent(action), idx + 1)]
-            hdr += ['};', '']
-        else:
-            tkns = []
-            tkns += [('NUM_STATES', len(the_states))]
-            tkns += [('NUM_EVENTS', len(the_events))]
-            tkns += [('NUM_TRANS', len(the_blocks))]
-            tkns += [('NUM_ACTIONS', len(the_actions))]
-            tkns += [('MAX_ACTIONS', max_actions)]
-            stts = []
-            for idx, state in enumerate(the_states):
-                stts += [(state, idx + 1)]
-            evts = []
-            for idx, event in enumerate(the_events):
-                evts += [(event, idx + 1)]
-            acts = []
-            for idx, action in enumerate(the_actions):
-                acts += [(action, idx + 1)]
-            print "tkns:", tkns
-            print "stts:", stts
-            print "evts:", evts
-            print "acts:", acts
-            hdr += ['static const struct {']
-            for item in tkns:
-                hdr += ['    int %s;' % item[0]]
-            for item in stts:
-                hdr += ['    int %s;' % item[0]]
-            for item in evts:
-                hdr += ['    int %s;' % item[0]]
-            for item in acts:
-                hdr += ['    int %s;' % item[0]]
-            hdr += ['} FSM_%s = {' % uname]
-            for item in tkns:
-                hdr += ['    .%s = %d,' % (item[0], item[1])]
-            for item in stts:
-                hdr += ['    .%s = %d,' % (item[0], item[1])]
-            for item in evts:
-                hdr += ['    .%s = %d,' % (item[0], item[1])]
-            for item in acts:
-                hdr += ['    .%s = %d,' % (item[0], item[1])]
-            hdr += ['};', '']
-        hdr += ['extern fsmStateMachine fsm_%s;' % self.name, '']
-        hdr += ['#endif /* %s_H */' % uname]
+        #hdr += ['#include "statemachine.h"', '']
+        tkns = []
+        tkns += [('NUM_STATES', len(the_states))]
+        tkns += [('NUM_EVENTS', len(the_events))]
+        tkns += [('NUM_TRANS', len(the_blocks))]
+        tkns += [('NUM_ACTIONS', len(the_actions))]
+        tkns += [('MAX_ACTIONS', max_actions)]
+        stts = []
+        for idx, state in enumerate(the_states):
+            stts += [(state, idx + 1)]
+        evts = []
+        for idx, event in enumerate(the_events):
+            evts += [(event, idx + 1)]
+        acts = []
+        for idx, action in enumerate(the_actions):
+            acts += [(action, idx + 1)]
+        print "tkns:", tkns
+        print "stts:", stts
+        print "evts:", evts
+        print "acts:", acts
+        for item in tkns:
+            hdr += ['#define %s %d'\
+                    % (self.mkName(item[0]), item[1])]
+        # States
+        hdr += ['', '/* States */']
+        hdr += ['typedef const struct %s_t *%s;'\
+                % (self.mkState(), self.mkState())]
+        for item in stts:
+            hdr += ['extern  const %s %s;'\
+                    % (self.mkState(), self.mkState(item[0]))]
+        # Events
+        hdr += ['', '/* Events */']
+        hdr += ['typedef const struct %s_t *%s;'\
+                % (self.mkEvent(), self.mkEvent())]
+        for item in evts:
+            hdr += ['extern  const %s %s;'\
+                    % (self.mkEvent(), self.mkEvent(item[0]))]
+        # Actions
+        hdr += ['', '/* Actions */']
+        hdr += ['typedef const struct %s_t *%s;'\
+                % (self.mkAction(), self.mkAction())]
+        for item in acts:
+            hdr += ['extern  const %s %s;'\
+                    % (self.mkAction(), self.mkAction(item[0]))]
+        # Epilog
+        hdr += ['', '/* Epilog */']
+        hdr += ['typedef struct %s_t *%s; /* instance */'\
+                % (self.mkName(), self.mkName())]
+        hdr += ['typedef %s (*%s)('\
+                % (self.mkState(), self.mkFunc('Action'))]
+        hdr += ['    %s smi,' % self.mkName()]
+        hdr += ['    %s state, ' % self.mkState()]
+        hdr += ['    %s event);' % self.mkEvent()]
+        hdr += ['typedef %s (*%s)('\
+                % (self.mkEvent(), self.mkFunc('Classify'))]
+        hdr += ['    %s smi,' % self.mkName()]
+        hdr += ['    %s state, ' % self.mkState()]
+        hdr += ['    %s event);' % self.mkEvent()]
+        hdr += ['%s %s(%s initial);'\
+                % (self.mkName(), self.mkFunc('Make'), self.mkEvent())]
+        hdr += ['void %s(%s smi);' % (self.mkName('Kill'), self.mkFunc())]
+        hdr += ['void %s(%s smi,'\
+                % (self.mkFunc('Run'), self.mkName())]
+        hdr += ['    %s ev);'\
+                % (self.mkEvent())]
+        hdr += ['void %s(%s smi,'\
+                % (self.mkFunc('SetAction'), self.mkName())]
+        hdr += ['    %s action,'\
+                % (self.mkAction())]
+        hdr += ['    %s af);'\
+                % (self.mkFunc('Action'))]
+        hdr += ['void %s(%s smi,'\
+                % (self.mkFunc('SetClassify'), self.mkName())]
+        hdr += ['    %s action,'\
+                % (self.mkAction())]
+        hdr += ['    %s af);'\
+                % (self.mkFunc('Classify'))]
+        #hdr += ['extern fsmStateMachine fsm_%s;' % self.name]
+        hdr += ['', '#endif /* %s_H */' % uname]
 
-        txt = ['#include <stdlib.h>']
+        txt = []
+        txt += ['#include <stdlib.h>']
         txt += ['#include <stdio.h>']
         txt += ['']
         tab_idx = 0
         act_idx = 0
         evt_idx = 0
-        act_txt = ['static int action_table[] = {']
-        evt_txt = ['static int event_table[] = {']
-        map_txt = ['static int map_table[] = {', '    0,']
-        tab_txt = ['static fsmTransTab trans_table[] = {']
-        slen = max([len(s) for s in the_states])
-        elen = max([len(e) for e in the_events])
+        # States
+        txt += ['', '/* States */']
+        txt += ['struct %s_t {' % self.mkState()]
+        txt += ['    char *name;']
+        txt += ['    int  index;']
+        txt += ['};']
+        txt += ['static const struct %s_t state_pointers [] = {' % self.mkState()]
+        txt += ['    { NULL, %s },' % len(stts)]
+        for item in stts:
+            txt += ['    { "%s", %d },'\
+                    % (item[0], item[1])]
+        txt += ['    { NULL, 0 }']
+        txt += ['};']
+        for item in stts:
+            txt += ['const %s %s = &state_pointers[%d];'\
+                    % (self.mkState(), self.mkState(item[0]), item[1])]
+        txt += ['enum {']
+        for item in stts:
+            txt += ['    e%s = %s,' % (self.mkState(item[0]), item[1])]
+        txt += ['};']
+        # Events
+        txt += ['', '/* Events */']
+        txt += ['struct %s_t {' % self.mkEvent()]
+        txt += ['    char *name;']
+        txt += ['    int  index;']
+        txt += ['};']
+        txt += ['static const struct %s_t event_pointers [] = {' % self.mkEvent()]
+        txt += ['    { NULL, %s },' % len(evts)]
+        for item in evts:
+            txt += ['    { "%s", %d },'\
+                    % (item[0], item[1])]
+        txt += ['    { NULL, 0 }']
+        txt += ['};']
+        for item in evts:
+            txt += ['const %s %s = &event_pointers[%d];'\
+                    % (self.mkEvent(), self.mkEvent(item[0]), item[1])]
+        txt += ['enum {']
+        for item in evts:
+            txt += ['    e%s = %s,' % (self.mkEvent(item[0]), item[1])]
+        txt += ['};']
+        # Actions
+        txt += ['', '/* Actions */']
+        txt += ['struct %s_t {' % self.mkAction()]
+        txt += ['    char *name;']
+        txt += ['    int  index;']
+        txt += ['};']
+        txt += ['static const struct %s_t action_pointers [] = {' % self.mkAction()]
+        txt += ['    { NULL, %s },' % len(evts)]
+        for item in acts:
+            txt += ['    { "%s", %d },'\
+                    % (item[0], item[1])]
+        txt += ['    { NULL, 0 }']
+        txt += ['};']
+        for item in acts:
+            txt += ['const %s %s = &action_pointers[%d];'\
+                    % (self.mkAction(), self.mkAction(item[0]), item[1])]
+        txt += ['enum {']
+        for item in acts:
+            txt += ['    e%s = %s,' % (self.mkAction(item[0]), item[1])]
+        txt += ['};']
+        #
+        txt += ['']
+        act_txt = ['/* TODO: describe the action_table */']
+        act_txt += ['static const struct %s_t * const action_table[] = {' % self.mkAction()]
+        evt_txt = ['/* TODO: describe the event_table */']
+        evt_txt += ['static const struct %s_t * event_table[] = {' % self.mkEvent()]
+        map_txt = ['/* TODO: describe the map_table */']
+        map_txt += ['static int map_table[] = {', '    0,']
+        tab_txt = ['/* TODO: describe the tab_table */']
+        tab_txt += ['typedef struct fsmTransTab_t fsmTransTab;']
+        tab_txt += ['typedef enum {']
+        tab_txt += ['    fsmActionClass = 1, /* Classifier Action Entry */']
+        tab_txt += ['    fsmActionTrans = 2  /* Transition Action Entry */']
+        tab_txt += ['} fsmActionType;']
+        tab_txt += ['struct fsmTransTab_t {']
+        tab_txt += ['    %s si; /* Input State */' % self.mkState()]
+        tab_txt += ['    %s ei; /* Input Event */' % self.mkEvent()]
+        tab_txt += ['    fsmActionType ac_type; /* Classifier or Transition */']
+        tab_txt += ['    union {']
+        tab_txt += ['        struct { /* Classifier Action Entry */']
+        tab_txt += ['            int ac_class; /* Action Classifier */']
+        tab_txt += ['            int ev_start; /* First output Event */']
+        tab_txt += ['            int ev_count; /* Number of candidates */']
+        tab_txt += ['        };']
+        tab_txt += ['        struct { /* Transition Action Entry */']
+        tab_txt += ['            %s so;        /* Output State */' % self.mkState()]
+        tab_txt += ['            int ac_start; /* First Action */']
+        tab_txt += ['            int ac_count; /* Number of Actions */']
+        tab_txt += ['        };']
+        tab_txt += ['    };']
+        tab_txt += ['};']
+        tab_txt += ['static fsmTransTab trans_table[] = {']
         for state in the_states:
             map_txt += ['    %d, /* %s */' % (tab_idx, state)]
             for event in the_events:
                 for block in the_blocks:
                     if block.source == state:
                         if block.event == event:
-                            actions = ', '.join([self.mkAction(a) for a in block.actions])
                             act_cnt = len(block.actions)
+                            for item in block.actions:
+                                act_txt += ['    &action_pointers[e%s],' % self.mkAction(item)]
                             target = state
                             if isinstance(block, Transition) and len(block.targets) > 0:
                                 target = block.targets[0]
-                            if act_cnt > 0:
-                                act_txt += ['    %s,' % actions]
                             line = ''
                             line += '    { /* %d */\n' % (tab_idx)
-                            line += '        .si=%-*s,\n' % (slen, self.mkState(state))
-                            line += '        .ei=%-*s,\n' % (elen, self.mkEvent(event))
+                            line += '        .si=&state_pointers[e%s],\n' % (self.mkState(state))
+                            line += '        .ei=&event_pointers[e%s],\n' % (self.mkEvent(event))
                             if isinstance(block, Transition):
                                 line += '        .ac_type=fsmActionTrans,\n'
-                                line += '        .so=%s,\n' % self.mkState(target)
+                                line += '        .so=&state_pointers[e%s],\n' % self.mkState(target)
                                 line += '        .ac_start=%d,\n' % act_idx
                                 line += '        .ac_count=%d,\n' % act_cnt
                             else:
                                 evt_cnt = len(block.targets)
-                                if evt_cnt > 0:
-                                    evt_txt += ['    %s,' % ', '.join([self.mkEvent(b[0]) for b in block.targets])]
+                                for item in block.targets:
+                                    evt_txt += ['    &event_pointers[e%s],' % self.mkEvent(item[0])]
                                 line += '        .ac_type=fsmActionClass,\n'
-                                line += '        .ac_class=%s,\n' % self.mkAction(block.actions[0])
+                                line += '        .ac_class=e%s,\n' % self.mkAction(block.actions[0])
                                 line += '        .ev_start=%d,\n' % evt_idx
                                 evt_idx += evt_cnt
                                 line += '        .ev_count=%s,\n' % evt_cnt
@@ -841,10 +946,9 @@ class StateMachine_GCC(StateMachine_Text):
         for action in the_actions:
             txt += ['    "%s",' % self.mkAction(action)]
         txt += ['    0', '};', '']
-        txt += ['struct fsmActionTab_t {']
-        txt += ['    fsmActionFunc *action;']
-        txt += ['};', '']
-        txt += ['static fsmActionFunc action_funcs[%s+1];' % self.mkName('NUM_ACTIONS')]
+        txt += ['']
+        txt += ['static %s action_funcs[%s+1];' % (self.mkFunc('Action'), self.mkName('NUM_ACTIONS'))]
+        txt += ['static %s classifier_funcs[%s+1];' % (self.mkFunc('Classify'), self.mkName('NUM_ACTIONS'))]
         txt += ['']
         txt += ['fsmStateMachine fsm_%s = {' % self.name]
         txt += ['    .name="%s",' % self.name]
