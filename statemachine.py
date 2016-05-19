@@ -171,26 +171,33 @@ class StateMachine(object):
 class StateMachine_Text(StateMachine):
     def __init__(self, other):
         StateMachine.__init__(self, other.name)
-        if isinstance(other, StateMachine):
-            self.name = other.name[:]
-            self.actions = other.actions[:]
-            self.events = other.events[:]
-            self.states = other.states[:]
-            self.tests = other.tests[:]
-            self.transitions = other.transitions[:]
-            self.classifiers = other.classifiers[:]
+        if not isinstance(other, StateMachine):
+            return
+        # Copy from the other one
+        self.name = other.name[:]
+        self.actions = other.actions[:]
+        self.events = other.events[:]
+        self.states = other.states[:]
+        self.tests = other.tests[:]
+        self.transitions = other.transitions[:]
+        self.classifiers = other.classifiers[:]
 
     def Inheritance(self):
+        '''
+        Expand inheritance by merging transitions from the base class
+        that are not in the derived class.
+        Then remove any state (ghost) that is not a target.
+        '''
         base_states = {}
         for derived in [state for state in self.states if len(state.base_list) > 0]:
             for b in derived.base_list:
                 base_states[b] = None
             replaced = [sc.event for sc in self.classifiers + self.transitions if sc.source == derived.name]
-            print "Derived:", derived, replaced
+            # print "Derived:", derived, replaced
             inherited = [sc for sc in self.classifiers + self.transitions if sc.source in derived.base_list]
-            print "Inherited:", derived, inherited
+            # print "Inherited:", derived, inherited
             virtual = [i for i in inherited if i.event not in replaced]
-            print "Virtual:", derived, virtual
+            # print "Virtual:", derived, virtual
             for item in virtual:
                 if isinstance(item, Classifier):
                     self.addClassifier(Classifier(derived.name, item.event, item.actions, item.targets))
@@ -200,14 +207,14 @@ class StateMachine_Text(StateMachine):
         for s in self.transitions:
             for t in s.targets:
                 target_states[t] = None
-        print "Targets:", target_states
+        # print "Targets:", target_states
         ghosts = [s for s in self.transitions if s.source not in target_states]
-        print "Ghosts:", ghosts
-        print "Bases:", base_states
+        # print "Ghosts:", ghosts
+        # print "Bases:", base_states
         for s in ghosts:
             if s.source in base_states:
                 self.transitions.remove(s)
-                print "Removed:", s
+                # print "Removed:", s
 
     def TextStateMachine(self):
         the_states = sorted([s.name for s in self.states])
@@ -238,7 +245,7 @@ class StateMachine_Text(StateMachine):
                 txt += ['    %s;' % line]
             txt += ['  }']
         for action in sorted(self.actions, key=lambda action: action.name.lower()):
-            print "##Action:", action
+            # print "##Action:", action
             txt += ['  CODE %s %s {' % (action.code_type, action.name)]
             for action_item in action.code_text:
                 txt += ['    @%s' % action_item[0]]
@@ -489,18 +496,18 @@ class StateMachine_Python(StateMachine_Text):
         slen = max([len(s) for s in the_states])
         elen = max([len(e) for e in the_events])
         txt += ['if __name__ == "__main__":']
-        print "Classifiers:", classifier_list
+        # print "Classifiers:", classifier_list
         for action in classifier_list:
             txt += ['    def %s(context, state, event):' % action[0]]
             line = '"State %%-%ds event %%-%ds: %s" %% (state, event)' % (slen, elen, action[0])
             txt += ['        print %s' % line]
             txt += ['        return "%s"' % action[1][0][0]]
-        print "Actions:", action_list
+        # print "Actions:", action_list
         for action in action_list:
             txt += ['    def %s(context, state, event):' % action]
             line = '"State %%-%ds event %%-%ds: %s" %% (state, event)' % (slen, elen, action)
             txt += ['        print %s' % line]
-        print "Tests:", test_list
+        # print "Tests:", test_list
         txt += ['    def TestStateSwitch_%s():' % self.name]
         for test in test_list:
             s1 = test[0]
@@ -512,7 +519,7 @@ class StateMachine_Python(StateMachine_Text):
         txt += ['    TestStateSwitch_%s()' % self.name]
         txt += ['    print "TestStateSwitch_%s() passed"' % self.name]
         for test in self.tests:
-            print "Test::", test
+            # print "Test::", test
             txt += ['    state_event = ("%s", None, 0)' % test.tests[0]]
             for t in test.tests:
                 if t in the_states:
@@ -527,16 +534,16 @@ class StateMachine_Python(StateMachine_Text):
             if len(the_blocks) == 0:
                 continue
             txt2 += ['    def %s (context, state, event):' % action]
-            print "##The Blocks:", the_blocks
+            # print "##The Blocks:", the_blocks
             for code_block in the_blocks:
-                print "##CodeBlock:", code_block
-                print "##CodeText:", code_block.code_text
+                # print "##CodeBlock:", code_block
+                # print "##CodeText:", code_block.code_text
                 for code_text in [c[1] for c in code_block.code_text if c[0] == 'PYTHON']:
-                    print "##CodeText:", code_text
+                    # print "##CodeText:", code_text
                     # Calculate the minimum white space for indent adjustment
                     min_wh = min([len(s) - len(s.lstrip(' ')) for s in code_text])
                     for code in code_text:
-                        print "##Code:", code[min_wh:]
+                        # print "##Code:", code[min_wh:]
                         txt2 += ['        ' + code[min_wh:]]
         if len(txt2) > 1:
             txt += txt2
@@ -604,7 +611,7 @@ class StateMachine_TCL(StateMachine_Text):
         slen = max([len(s) for s in the_states])
         elen = max([len(e) for e in the_events])
         txt += ['if { "[lindex [split [info nameofexecutable] "/"] end]" == "tclsh"} {']
-        print "Classifiers:", classifier_list
+        # print "Classifiers:", classifier_list
         for action in classifier_list:
             txt += ['    proc %s {context state event} {' % action[0]]
             line = 'State [format "%%-%ds" ${state}] event [format "%%-%ds" ${event}]: %s' %\
@@ -612,14 +619,14 @@ class StateMachine_TCL(StateMachine_Text):
             txt += ['        puts "%s"' % line]
             txt += ['        return "%s"' % action[1][0][0]]
             txt += ['    }']
-        print "Actions:", action_list
+        # print "Actions:", action_list
         for action in action_list:
             txt += ['    proc %s {context state event} {' % action]
             line = 'State [format "%%-%ds" ${state}] event [format "%%-%ds" ${event}]: %s' %\
                     (slen, elen, action)
             txt += ['        puts "%s"' % line]
             txt += ['    }']
-        print "Tests:", test_list
+        # print "Tests:", test_list
         for test in test_list:
             s1 = test[0]
             ev = test[1]
@@ -629,7 +636,7 @@ class StateMachine_TCL(StateMachine_Text):
             txt += ['    if {[lindex ${state_event} 0] != "%s"} {error "state fail!"}' % (s2)]
         txt += ['    puts "TestStateSwitch_%s() passed"' % self.name]
         for test in self.tests:
-            print "Test::", test
+            # print "Test::", test
             txt += ['    set state_event [list "%s" {} 0]' % test.tests[0]]
             for t in test.tests:
                 if t in the_states:
@@ -644,16 +651,16 @@ class StateMachine_TCL(StateMachine_Text):
             if len(the_blocks) == 0:
                 continue
             txt2 += ['    proc %s {context state event} {' % action]
-            print "##The Blocks:", the_blocks
+            # print "##The Blocks:", the_blocks
             for code_block in the_blocks:
-                print "##CodeBlock:", code_block
-                print "##CodeText:", code_block.code_text
+                # print "##CodeBlock:", code_block
+                # print "##CodeText:", code_block.code_text
                 for code_text in [c[1] for c in code_block.code_text if c[0] == 'TCL']:
-                    print "##CodeText:", code_text
+                    # print "##CodeText:", code_text
                     # Calculate the minimum white space for indent adjustment
                     min_wh = min([len(s) - len(s.lstrip(' ')) for s in code_text])
                     for code in code_text:
-                        print "##Code:", code[min_wh:]
+                        # print "##Code:", code[min_wh:]
                         txt2 += ['        ' + code[min_wh:]]
             txt2 += ['    }']
         if len(txt2) > 1:
@@ -693,6 +700,15 @@ class StateMachine_GCC(StateMachine_Text):
             return  self.prefix + '%s_ACTION_%s' % (self.uname, name)
         return  self.prefix + '%s_ACTION' % (self.uname)
 
+    def mkActionFunc(self, action):
+        txt = []
+        txt += ['static %s %s(' % (self.mkEvent(), action)]
+        txt += ['    %s smi,' % self.mkName()]
+        txt += ['    %s state,' % self.mkState()]
+        txt += ['    %s event,' % self.mkEvent()]
+        txt += ['    void *pPrivate)']
+        return txt
+
     def Generate_Hdr(self, stts, evts, acts):
         hdr = []
         hdr += ['#ifndef %s_H' % self.uname]
@@ -728,8 +744,9 @@ class StateMachine_GCC(StateMachine_Text):
         hdr += ['typedef %s (*%s)('\
                 % (self.mkEvent(), self.mkFunc('Action'))]
         hdr += ['    %s smi,' % self.mkName()]
-        hdr += ['    %s state, ' % self.mkState()]
-        hdr += ['    %s event);' % self.mkEvent()]
+        hdr += ['    %s state,' % self.mkState()]
+        hdr += ['    %s event,' % self.mkEvent()]
+        hdr += ['    void *pPrivate);']
         # Constructor
         hdr += ['', '/* Statemachine Instance Constructor */']
         hdr += ['%s %s(const char *name, %s initial);'\
@@ -737,10 +754,8 @@ class StateMachine_GCC(StateMachine_Text):
         hdr += ['', '/* Statemachine Instance Destructor */']
         hdr += ['void %s(%s smi);' % (self.mkName('InstanceKill'), self.mkFunc())]
         hdr += ['', '/* Statemachine Instance Driver */']
-        hdr += ['void %s(%s smi,'\
-                % (self.mkFunc('InstanceRun'), self.mkName())]
-        hdr += ['    %s ev);'\
-                % (self.mkEvent())]
+        hdr += ['void %s(%s smi, %s ev);'\
+                % (self.mkFunc('InstanceRun'), self.mkName(), self.mkEvent())]
         #
         hdr += ['', '/* Statemachine Class Action Setter */']
         hdr += ['void %s('\
@@ -756,11 +771,67 @@ class StateMachine_GCC(StateMachine_Text):
                 % (self.mkAction())]
         hdr += ['    %s af);'\
                 % (self.mkFunc('Action'))]
-        #hdr += ['extern fsmStateMachine fsm_%s;' % self.name]
+        hdr += ['', '/* Report Function accessors */']
+        hdr += ['void %s(%s smi, void (*reportFunc)(%s smi, const char *fmt, ...));'\
+                % (self.mkFunc('SetReportFunc'), self.mkName(), self.mkName())]
+        hdr += ['', '/* Private data accessors */']
+        hdr += ['void %s(%s smi, void *data, void (*pKiller)(void *));' % (self.mkFunc('SetPrivate'), self.mkName())]
+        hdr += ['void *%s(%s smi);' % (self.mkFunc('GetPrivate'), self.mkName())]
+
         hdr += ['', '#endif /* %s_H */' % self.uname]
         return hdr
 
+    def Generate_Skel(self):
+        txt = []
+        txt += ['#include "%s.fsm.h"' % self.name]
+        txt += ['']
+        the_blocks = [b for b in self.classifiers + self.transitions]
+        the_actions = []
+        for block in the_blocks:
+            for action in block.actions:
+                if action not in the_actions:
+                    the_actions.append(action)
+        the_actions = sorted(the_actions)
+        for action in the_actions:
+            code = self.mkActionFunc(action)
+            code[-1] += ';'
+            txt += code
+        txt += ['']
+        txt += ['static void init(void)']
+        txt += ['{']
+        for action in the_actions:
+            txt += ['    %s(%s, %s);' % (self.mkFunc('ClassSetAction'), self.mkAction(action), action)]
+        txt += ['}']
+        txt += ['']
+        txt += ['static %s make(' % self.mkName()]
+        txt += ['    char *name,']
+        txt += ['    %s initialState,' % self.mkState()]
+        txt += ['    void *pPrivate,']
+        txt += ['    void (*pKiller)(void *))']
+        txt += ['{']
+        txt += ['    %s smi;' % self.mkName()]
+        txt += ['    smi = %s(name, initialState);' % (self.mkFunc('InstanceMake'))]
+        txt += ['    %s(smi, pPrivate, pKiller);' % (self.mkFunc('SetPrivate'))]
+        txt += ['    return smi;']
+        txt += ['}']
+        txt += ['']
+        txt += ['typedef struct private_data_t PRIVATE_DATA, *pPRIVATE_DATA;']
+        txt += ['static struct private_data_t {']
+        txt += ['} private_data;']
+        txt += ['']
+        txt += ['static %s smi;' % self.mkName()]
+        txt += ['']
+        for action in the_actions:
+            txt += self.mkActionFunc(action)
+            txt += ['{']
+            txt += ['    pPRIVATE_DATA self = (pPRIVATE_DATA) pPrivate;']
+            txt += ['    return NULL;']
+            txt += ['}']
+            txt += ['']
+        return ([], txt)
+
     def Generate_Code(self):
+        hdr = []
         txt = []
         txt += ['/* Create an Instance of this Statemachine */']
         txt += ['%s %s(const char *name, %s initial)'\
@@ -773,8 +844,6 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['    /* TODO initialisation */']
         txt += ['    smi->name = strdup(name);']
         txt += ['    smi->fsm = &fsm_%s;' % self.name]
-        txt += ['    smi->actionTab = (%s *) calloc(%s, sizeof(%s));'\
-                % (self.mkFunc('Action'), self.mkName('NUM_ACTIONS'), self.mkFunc('Action'))]
         txt += ['    smi->currentState = initial;']
         txt += ['    return smi;']
         txt += ['}']
@@ -785,13 +854,16 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['    if (smi == NULL)']
         txt += ['        return;']
         txt += ['    free(smi->name);']
-        txt += ['    free(smi->actionTab);']
+        txt += ['    if (smi->actionTab)']
+        txt += ['        free(smi->actionTab);']
+        txt += ['    if (smi->pPrivate && smi->pKiller)']
+        txt += ['        (*smi->pKiller)(smi->pPrivate);']
         txt += ['    free(smi);']
         txt += ['}']
         txt += ['']
         txt += ['/* Run one Event for this Instance of this Statemachine */']
-        txt += ['%s %s(%s smi, %s ev)'\
-                % (self.mkState(), self.mkFunc('RunStateEvent'), self.mkName(), self.mkEvent())]
+        txt += ['static %s %s(%s smi,' % (self.mkState(), self.mkFunc('RunStateEvent'), self.mkName())]
+        txt += ['    %s ev)' % (self.mkEvent())]
         txt += ['{']
         txt += ['    int i, j, k;']
         txt += ['    %s next_event = NULL;' % self.mkEvent()]
@@ -811,22 +883,26 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['                %s fn;' % self.mkFunc('Action')]
         txt += ['                switch (actionType) {']
         txt += ['                    case fsmActionClass:']
-        txt += ['                        k = tab->ac_class;']
+        txt += ['                        k = tab->u.c.ac_class;']
         txt += ['                        fn = fsm->actionTab[k];']
         txt += ['                        if (smi->actionTab && smi->actionTab[k])']
         txt += ['                            fn = smi->actionTab[k];']
-        txt += ['                        next_event = (*fn)(smi, smi->currentState, ev);']
+        txt += ['                        next_event = (*fn)(smi, smi->currentState, ev, smi->pPrivate);']
+        txt += ['                        if (smi->reportFunc)']
+        txt += ['                            (*smi->reportFunc)(smi, "%s(%s) --> %s [%s]", smi->currentState->name, ev->name, next_event->name, action_pointers[k].name);']
         txt += ['                        ev = next_event;']
         txt += ['                        break;']
         txt += ['                    case fsmActionTrans:']
-        txt += ['                        if (tab->so)']
-        txt += ['                            next_state = tab->so;']
-        txt += ['                        for (j = 0; j < tab->ac_count; ++ j) {']
-        txt += ['                            k = fsm->actTab[tab->ac_start + j]->index;']
+        txt += ['                        if (tab->u.t.so)']
+        txt += ['                            next_state = tab->u.t.so;']
+        txt += ['                        for (j = 0; j < tab->u.t.ac_count; ++ j) {']
+        txt += ['                            k = fsm->actTab[tab->u.t.ac_start + j]->index;']
         txt += ['                            fn = fsm->actionTab[k];']
         txt += ['                            if (smi->actionTab && smi->actionTab[k])']
         txt += ['                                fn = smi->actionTab[k];']
-        txt += ['                            (void) (*fn)(smi, smi->currentState, ev);']
+        txt += ['                            (void) (*fn)(smi, smi->currentState, ev, smi->pPrivate);']
+        txt += ['                            if (smi->reportFunc)']
+        txt += ['                                (*smi->reportFunc)(smi, "%s(%s) [%s]", smi->currentState->name, ev->name, action_pointers[k].name);']
         txt += ['                        }']
         txt += ['                        break;']
         txt += ['                }']
@@ -842,13 +918,15 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['{']
         txt += ['    %s next_state = %s(smi, ev);'\
                 % (self.mkState(), self.mkFunc('RunStateEvent'))]
-        txt += ['    if (next_state != smi->currentState) {']
+        txt += ['    while (next_state != smi->currentState) {']
         txt += ['        if (smi->fsm->exitEvent)']
         txt += ['            %s(smi, smi->fsm->exitEvent);'\
                 % self.mkFunc('RunStateEvent')]
+        txt += ['        if (smi->reportFunc)']
+        txt += ['            (*smi->reportFunc)(smi, "%s ==> %s", smi->currentState->name, next_state->name);']
         txt += ['        smi->currentState = next_state;']
         txt += ['        if (smi->fsm->entryEvent)']
-        txt += ['            %s(smi, smi->fsm->entryEvent);'\
+        txt += ['            next_state = %s(smi, smi->fsm->entryEvent);'\
                 % self.mkFunc('RunStateEvent')]
         txt += ['    }']
         txt += ['}']
@@ -867,11 +945,31 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['        %s action,' % self.mkAction()]
         txt += ['        %s func)' % self.mkFunc('Action')]
         txt += ['{']
-        txt += ['    if (action->index > 0 && action->index <= %s)'\
+        txt += ['    if (action->index > 0 && action->index <= %s) {'\
                 % self.mkName('NUM_ACTIONS')]
+        txt += ['        if (smi->actionTab == NULL)']
+        txt += ['            smi->actionTab = (%s *) calloc(%s + 1, sizeof(%s));'\
+                % (self.mkFunc('Action'), self.mkName('NUM_ACTIONS'), self.mkFunc('Action'))]
         txt += ['        smi->actionTab[action->index] = func;']
+        txt += ['    }']
         txt += ['}']
-        return txt
+        hdr += ['', '/* Report Function accessors */']
+        txt += ['void %s(%s smi, void (*reportFunc)(%s smi, const char *fmt, ...))'\
+                % (self.mkFunc('SetReportFunc'), self.mkName(), self.mkName())]
+        txt += ['{']
+        txt += ['    smi->reportFunc = reportFunc;']
+        txt += ['}']
+        txt += ['', '/* Private data accessors */']
+        txt += ['void %s(%s smi, void *data, void (*pKiller)(void *))' % (self.mkFunc('SetPrivate'), self.mkName())]
+        txt += ['{']
+        txt += ['    smi->pPrivate = data;']
+        txt += ['    smi->pKiller = pKiller;']
+        txt += ['}']
+        txt += ['void *%s(%s smi)' % (self.mkFunc('GetPrivate'), self.mkName())]
+        txt += ['{']
+        txt += ['    return smi->pPrivate;']
+        txt += ['}']
+        return (hdr, txt)
 
     def Generate_C(self):
         the_states = sorted([s.name for s in self.states])
@@ -902,10 +1000,10 @@ class StateMachine_GCC(StateMachine_Text):
         acts = []
         for idx, action in enumerate(the_actions):
             acts += [(action, idx + 1)]
-        print "tkns:", tkns
-        print "stts:", stts
-        print "evts:", evts
-        print "acts:", acts
+        # print "tkns:", tkns
+        # print "stts:", stts
+        # print "evts:", evts
+        # print "acts:", acts
 
         hdr = self.Generate_Hdr(stts, evts, acts)
 
@@ -994,13 +1092,13 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['            int ac_class; /* Action Classifier */']
         txt += ['            int ev_start; /* First output Event */']
         txt += ['            int ev_count; /* Number of candidates */']
-        txt += ['        };']
+        txt += ['        } c;']
         txt += ['        struct { /* Transition Action Entry */']
         txt += ['            %s so;        /* Output State */' % self.mkState()]
         txt += ['            int ac_start; /* First Action */']
         txt += ['            int ac_count; /* Number of Actions */']
-        txt += ['        };']
-        txt += ['    };']
+        txt += ['        } t;']
+        txt += ['    } u;']
         txt += ['};']
         # Generate the Transition Tables
         act_txt = ['/* TODO: the action_table has sequences of actions per transition */']
@@ -1031,18 +1129,18 @@ class StateMachine_GCC(StateMachine_Text):
                         line += '        .ei=&event_pointers[e%s],\n' % (self.mkEvent(event))
                         if isinstance(block, Transition):
                             line += '        .ac_type=fsmActionTrans,\n'
-                            line += '        .so=&state_pointers[e%s],\n' % self.mkState(target)
-                            line += '        .ac_start=%d,\n' % act_idx
-                            line += '        .ac_count=%d,\n' % act_cnt
+                            line += '        .u.t.so=&state_pointers[e%s],\n' % self.mkState(target)
+                            line += '        .u.t.ac_start=%d,\n' % act_idx
+                            line += '        .u.t.ac_count=%d,\n' % act_cnt
                         else:
                             evt_cnt = len(block.targets)
                             for item in block.targets:
                                 evt_txt += ['    &event_pointers[e%s],' % self.mkEvent(item[0])]
                             line += '        .ac_type=fsmActionClass,\n'
-                            line += '        .ac_class=e%s,\n' % self.mkAction(block.actions[0])
-                            line += '        .ev_start=%d,\n' % evt_idx
+                            line += '        .u.c.ac_class=e%s,\n' % self.mkAction(block.actions[0])
+                            line += '        .u.c.ev_start=%d,\n' % evt_idx
                             evt_idx += evt_cnt
-                            line += '        .ev_count=%s,\n' % evt_cnt
+                            line += '        .u.c.ev_count=%s,\n' % evt_cnt
                             for action in block.actions:
                                 if action not in classifier_list:
                                     classifier_list[action] = block.targets[0]
@@ -1100,8 +1198,9 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['    const fsmStateMachine *fsm;']
         txt += ['    %s *actionTab; /* Instance Actions */' % self.mkFunc('Action')]
         txt += ['    %s currentState;' % self.mkState()]
-        txt += ['    void *priv; /* private */']
-        txt += ['    void (*killPriv)(void*);']
+        txt += ['    void (*reportFunc)(%s smi, const char *fmt, ...);' % self.mkName()]
+        txt += ['    void *pPrivate; /* private */']
+        txt += ['    void (*pKiller)(void*);']
         txt += ['};']
         txt += ['', '/* State Machine Initializer */']
         txt += ['static const fsmStateMachine fsm_%s = {' % self.name]
@@ -1122,13 +1221,23 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['    .transTab=trans_table,']
         txt += ['    .actionTab=action_funcs']
         txt += ['};', '']
-        txt += self.Generate_Code()
+        code = self.Generate_Code()
+        hdr += code[0]
+        txt += code[1]
         txt += ['', '#ifdef UNIT_TEST']
+        txt += ['', '#ifdef SKELETON']
+        txt += ['/* Start Skeleton */']
+        code = self.Generate_Skel()
+        hdr += code[0]
+        txt += code[1]
+        txt += ['/* End Skeleton */']
+        txt += ['#endif /* SKELETON */', '']
         for action in the_actions:
             txt += ['static %s %s_test(' % (self.mkEvent(), self.mkAction(action))]
             txt += ['        %s smi,' % self.mkName()]
             txt += ['        %s state,' % self.mkState()]
-            txt += ['        %s event)' % self.mkEvent()]
+            txt += ['        %s event,' % self.mkEvent()]
+            txt += ['        void *pPrivate)']
             txt += ['{']
             if action in classifier_list:
                 next_event = classifier_list[action][0]
@@ -1162,17 +1271,17 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['                }']
         txt += ['            }']
         for test in self.tests:
-            print "Test::", test
+            # print "Test::", test
             txt += ['    do {']
-            txt += ['        smi->currentState = %s;' % test.tests[0]]
+            txt += ['        smi->currentState = %s;' % self.mkState(test.tests[0])]
             for t in test.tests:
                 if t in the_states:
-                    txt += ['        if (smi->currentState != %s) {' % t]
-                    txt += ['            printf("State is %%s but expected %s\\n", fsm->stateNames[smi.currentState]);' % t]
+                    txt += ['        if (smi->currentState != %s) {' % self.mkState(t)]
+                    txt += ['            printf("State is %%s but expected %s\\n", smi->currentState->name);' % t]
                     txt += ['            break;']
                     txt += ['        }']
                 else:
-                    txt += ['        fsmRunStateMachine(&smi, %s);' % t]
+                    txt += ['        %s(smi, %s);' % (self.mkFunc('InstanceRun'), self.mkEvent(t))]
             txt += ['        printf("Test Passed: %s\\n");' % repr(test)]
             txt += ['    } while (0);']
         txt += ['    %s(smi);' % (self.mkFunc('InstanceKill'))]

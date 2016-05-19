@@ -41,7 +41,8 @@ def FormatEvent(event):
 def Build_StateMachine(sm):
     new_sm = statemachine.StateMachine(sm['Name'])
     the_states = sorted(sm['States'])
-    print '**The States:', the_states
+    if Verbose:
+        print '**The States:', the_states
     for s in the_states:
         if s in sm['Inherits']:
             new_sm.addState(statemachine.State(s, sm['Inherits'][s]))
@@ -49,9 +50,11 @@ def Build_StateMachine(sm):
             new_sm.addState(statemachine.State(s))
     the_events = []
     for b in sm['Blocks']:
-        print "**The Block:", b
+        if Verbose:
+            print "**The Block:", b
         for t in sm['Blocks'][b]:
-            print "**The Transit:", t
+            if Verbose:
+                print "**The Transit:", t
             if t[1] not in the_events:
                 the_events.append(t[1])
                 if len(t[1]) > 1:
@@ -62,7 +65,8 @@ def Build_StateMachine(sm):
             if t[0] == 1:
                 new_sm.addClassifier(statemachine.Classifier(b, t[1][0], t[2], t[3]))
                 for e in t[3]:
-                    print "**Classified:", e
+                    if Verbose:
+                        print "**Classified:", e
                     if e not in the_events:
                         the_events.append(e)
                         if len(e) > 1:
@@ -74,7 +78,8 @@ def Build_StateMachine(sm):
                 new_sm.addTransition(statemachine.Transition(b, t[1][0], t[2], t[3]))
     for c in sm['Code']:
         code = sm['Code'][c]
-        print "**The Code:", c, code
+        if Verbose:
+            print "**The Code:", c, code
         action = statemachine.Action(code['name'], code['type'], code['text'])
         new_sm.addAction(action)
 
@@ -82,9 +87,11 @@ def Build_StateMachine(sm):
         new_sm.addTest(statemachine.Test(t))
 
     the_events = sorted(the_events)
-    print '**The Events:', [FormatEvent(e) for e in the_events]
+    if Verbose:
+        print '**The Events:', [FormatEvent(e) for e in the_events]
 
-    new_sm.printit()
+    if Verbose:
+        new_sm.printit()
     return new_sm
 
 def PrintParseError(message):
@@ -674,9 +681,13 @@ def generate_source(the_fsm, SourceData, source_file):
     with open('%s.h' % dest_file, 'w') as fdo:
         fdo.write('\n'.join(hdr_gcc))
         fdo.write('\n')
-    txt_gcc.insert(0, '#include "%s.h"' % dest_file)
+    txt_gcc.insert(0, '#include "%s.h"' % basename)
     with open('%s.c' % dest_file, 'w') as fdo:
         fdo.write('\n'.join(txt_gcc))
+        fdo.write('\n')
+    hdr_skl, txt_skl = fsm_gcc.Generate_Skel()
+    with open('%s.skel.c' % dest_file, 'w') as fdo:
+        fdo.write('\n'.join(txt_skl))
         fdo.write('\n')
     text.write('<TR><TD ALIGN="left">\n')
     text.write('<PRE>' + escape('\n'.join(hdr_gcc)) + '</PRE>')
@@ -697,7 +708,7 @@ def generate_source(the_fsm, SourceData, source_file):
     pdf_cmd = 'wkhtmltopdf -T 10mm -B 10mm %s.html %s.pdf' % (dest_file, dest_file)
     print pdf_cmd
     #os.system(pdf_cmd)
-    gcc_cmd = 'gcc -DUNIT_TEST %s.c statemachine.c' % (dest_file)
+    gcc_cmd = 'gcc -DUNIT_TEST %s.c' % (dest_file)
     print gcc_cmd
 
 def main():
