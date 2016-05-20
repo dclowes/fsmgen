@@ -93,6 +93,8 @@ class StateMachine(object):
         self.tests = []
         self.transitions = []
         self.classifiers = []
+        self.action_list = []
+        self.action_comments = {}
 
     def __repr__(self):
         text = "name = %s" % repr(self.name)
@@ -167,6 +169,7 @@ class StateMachine(object):
         print "StateMachine:", self.name
         print "States:", ", ".join([repr(s) for s in self.states])
         print "Events:", ", ".join([repr(s) for s in self.events])
+        print "Actions:", ", ".join([repr(s) for s in self.action_list])
         for c in self.classifiers:
             print "Classifier:", c
         for t in self.transitions:
@@ -189,6 +192,8 @@ class StateMachine_Text(StateMachine):
         self.tests = other.tests[:]
         self.transitions = other.transitions[:]
         self.classifiers = other.classifiers[:]
+        self.action_list = other.action_list[:]
+        self.action_comments = other.action_comments
 
     def Inheritance(self):
         '''
@@ -254,6 +259,26 @@ class StateMachine_Text(StateMachine):
             elif len(e.comments) > 1:
                 lines += ['      "%s"' % c for c in e.comments]
             if event == the_events[-1]:
+                lines[-1] += ';'
+            else:
+                lines[-1] += ','
+            txt += lines
+        txt += ['  ACTIONS']
+        the_actions = sorted(self.action_list)
+        print "the_actions:", the_actions
+        for action in the_actions:
+            if action in self.action_comments:
+                comments = self.action_comments[action]
+            else:
+                comments = []
+            lines = ['    %s' % action]
+            if len(comments) == 0:
+                lines[0] += ' "No Comment"'
+            elif len(comments) == 1:
+                lines[0] += ' "%s"' % comments[0]
+            elif len(comments) > 1:
+                lines += ['      "%s"' % c for c in comments]
+            if action == the_actions[-1]:
                 lines[-1] += ';'
             else:
                 lines[-1] += ','

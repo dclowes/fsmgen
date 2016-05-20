@@ -98,6 +98,11 @@ def Build_StateMachine(sm):
     for e in new_sm.events:
         if e.name in sm['Event_Comments']:
             e.comments += sm['Event_Comments'][e.name]
+    new_sm.action_list = sm['Actions']
+    new_sm.action_comments = sm['Action_Comments']
+    if Verbose:
+        print '***The Actions:', sm['Actions']
+        print '***The Actions:', sm['Action_Comments']
     if Verbose:
         new_sm.printit()
     return new_sm
@@ -110,9 +115,11 @@ def PrintParseError(message):
 
 reserved = {
     'STATEMACHINE': 'STATEMACHINE',
+    'ACTIONS': 'ACTIONS',
     'STATES': 'STATES',
-    'STATE': 'STATE',
     'EVENTS': 'EVENTS',
+    'ACTION': 'ACTION',
+    'STATE': 'STATE',
     'EVENT': 'EVENT',
     'CODE' : 'CODE',
     'TEST' : 'TEST',
@@ -346,6 +353,7 @@ def p_fsm_statement(p):
                  | STATE state_block
                  | CODE code
                  | TEST test_list
+                 | ACTIONS action_list
     '''
     p[0] = p[1]
 
@@ -354,13 +362,9 @@ def p_state_list(p):
     state_list : state_type
           | state_list COMMA state_type
     '''
-    if len(p) > 3:
-        if p[3] not in Statemachine['States']:
-            Statemachine['States'].append(p[3])
+    if len(p) == 4:
         p[0] = p[1] + [p[3]]
     else:
-        if p[1] not in Statemachine['States']:
-            Statemachine['States'].append(p[1])
         p[0] = [p[1]]
 
 def p_state_type(p):
@@ -369,9 +373,9 @@ def p_state_type(p):
                | state_type text_string
     '''
     p[0] = p[1]
-    if p[1] not in Statemachine['States']:
-        Statemachine['States'].append(p[1])
-    if len(p) > 2:
+    if p[0] not in Statemachine['States']:
+        Statemachine['States'].append(p[0])
+    if len(p) == 3:
         if p[1] not in Statemachine['State_Comments']:
             Statemachine['State_Comments'][p[1]] = []
         Statemachine['State_Comments'][p[1]].append(p[2])
@@ -383,12 +387,8 @@ def p_event_list(p):
     '''
     ReportP(p, "event_list")
     if len(p) == 4:
-        if p[3] not in Statemachine['Events']:
-            Statemachine['Events'].append(p[3])
         p[0] = p[1] + [p[3]]
     else:
-        if p[1] not in Statemachine['Events']:
-            Statemachine['Events'].append(p[1])
         p[0] = [p[1]]
 
 def p_event_type(p):
@@ -403,9 +403,35 @@ def p_event_type(p):
         p[0] = [p[1], p[3]]
     elif len(p) == 3:
         p[0] = p[1]
-        if p[1][0] not in Statemachine['Event_Comments']:
-            Statemachine['Event_Comments'][p[1][0]] = []
-        Statemachine['Event_Comments'][p[1][0]].append(p[2])
+        if p[0][0] not in Statemachine['Event_Comments']:
+            Statemachine['Event_Comments'][p[0][0]] = []
+        Statemachine['Event_Comments'][p[0][0]].append(p[2])
+    if p[0][0] not in Statemachine['Events']:
+        Statemachine['Events'].append(p[0][0])
+
+def p_action_list(p):
+    '''
+    action_list : action_type
+                | action_list COMMA action_type
+    '''
+    ReportP(p, "action_list")
+    if len(p) == 4:
+        p[0] = p[1] + [p[3]]
+    else:
+        p[0] = [p[1]]
+
+def p_action_type(p):
+    '''
+    action_type : id_or_str
+                | action_type text_string
+    '''
+    p[0] = p[1]
+    if p[0] not in Statemachine['Actions']:
+        Statemachine['Actions'].append(p[0])
+    if len(p) == 3:
+        if p[0][0] not in Statemachine['Action_Comments']:
+            Statemachine['Action_Comments'][p[0][0]] = []
+        Statemachine['Action_Comments'][p[0][0]].append(p[2])
 
 def p_state_block(p):
     '''
@@ -445,14 +471,14 @@ def p_state_code(p):
 
 def p_state_code_1(p): # Classifier
     '''
-    state_code_1 : event_type CLASSIFIER id_or_str TRANSITION event_list
-                 | event_type DISPATCH id_or_str CLASSIFIER event_list
+    state_code_1 : event_type CLASSIFIER action_type TRANSITION event_list
+                 | event_type DISPATCH action_type CLASSIFIER event_list
     '''
     p[0] = [1, p[1], [p[3]], p[5]]
 
 def p_state_code_2(p): # Action only
     '''
-    state_code_2 : event_type DISPATCH id_list
+    state_code_2 : event_type DISPATCH action_list
     '''
     p[0] = [2, p[1], p[3], []]
 
@@ -464,7 +490,7 @@ def p_state_code_3(p): # Transition only
 
 def p_state_code_4(p): # Action and Transition
     '''
-    state_code_4 : event_type DISPATCH id_list TRANSITION state_list
+    state_code_4 : event_type DISPATCH action_list TRANSITION state_list
     '''
     ReportP(p, "state_code")
     p[0] = [4, p[1], p[3], p[5]]
@@ -597,6 +623,8 @@ def process_source(source_file):
     Statemachine['State_Comments'] = {}
     Statemachine['Events'] = []
     Statemachine['Event_Comments'] = {}
+    Statemachine['Actions'] = []
+    Statemachine['Action_Comments'] = {}
     Statemachine['Inherits'] = {}
     Statemachine['Blocks'] = {}
     Statemachine['Tests'] = []
