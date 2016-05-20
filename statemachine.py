@@ -155,6 +155,12 @@ class StateMachine(object):
                 return s
         return None
 
+    def isClassifier(self, name):
+        for item in self.classifiers:
+            if name in item.actions:
+                return (True, item.targets)
+        return (False, ['NULL'])
+
     def printit(self):
         print "StateMachine:", self.name
         print "States:", ", ".join([repr(s) for s in self.states])
@@ -233,10 +239,10 @@ class StateMachine_Text(StateMachine):
             for block in the_blocks:
                 line = '%s' % block.event
                 if isinstance(block, Classifier):
-                    line += ' --> %s' % ', '.join(block.actions)
+                    line += ' -> %s' % ', '.join(block.actions)
                     if len(block.targets) > 0:
                         next_events = sorted([e[0] for e in block.targets])
-                        line += ' => %s' % ', '.join(next_events)
+                        line += ' --> %s' % ', '.join(next_events)
                 else:
                     if len(block.actions) > 0:
                         line += ' -> %s' % ', '.join(block.actions)
@@ -771,12 +777,15 @@ class StateMachine_GCC(StateMachine_Text):
                 % (self.mkAction())]
         hdr += ['    %s af);'\
                 % (self.mkFunc('Action'))]
+        hdr += ['', '/* Statemachine Class Action Initial Setter */']
+        hdr += ['void %s(void);' % self.mkFunc('ClassInit')]
         hdr += ['', '/* Report Function accessors */']
         hdr += ['void %s(%s smi, void (*reportFunc)(%s smi, const char *fmt, ...));'\
                 % (self.mkFunc('SetReportFunc'), self.mkName(), self.mkName())]
         hdr += ['', '/* Private data accessors */']
         hdr += ['void %s(%s smi, void *data, void (*pKiller)(void *));' % (self.mkFunc('SetPrivate'), self.mkName())]
         hdr += ['void *%s(%s smi);' % (self.mkFunc('GetPrivate'), self.mkName())]
+        hdr += ['const char *%s(%s smi);' % (self.mkFunc('GetName'), self.mkName())]
 
         hdr += ['', '#endif /* %s_H */' % self.uname]
         return hdr
@@ -784,6 +793,9 @@ class StateMachine_GCC(StateMachine_Text):
     def Generate_Skel(self):
         txt = []
         txt += ['#include "%s.fsm.h"' % self.name]
+        txt += ['#include <stdlib.h>']
+        txt += ['/* BEGIN CUSTOM: include files */']
+        txt += ['/* END CUSTOM: include files */']
         txt += ['']
         the_blocks = [b for b in self.classifiers + self.transitions]
         the_actions = []
@@ -792,12 +804,33 @@ class StateMachine_GCC(StateMachine_Text):
                 if action not in the_actions:
                     the_actions.append(action)
         the_actions = sorted(the_actions)
-        for action in the_actions:
-            code = self.mkActionFunc(action)
-            code[-1] += ';'
-            txt += code
+#        for action in the_actions:
+#            code = self.mkActionFunc(action)
+#            code[-1] += ';'
+#            txt += code
+#        txt += ['']
+        txt += ['typedef %s_PRIVATE_DATA *pPRIVATE_DATA;' % self.mkName()]
         txt += ['']
-        txt += ['static void init(void)']
+        txt += ['/* BEGIN CUSTOM: forward declarations */']
+        txt += ['/* END CUSTOM: forward declarations */']
+        txt += ['']
+        for action in the_actions:
+            (result, targets) = self.isClassifier(action)
+            if result:
+                txt += ['/* Classifier returns: */']
+                for target in targets:
+                    txt += ['/*    %s */' % self.mkEvent(target[0])]
+            else:
+                txt += ['/* Transition: returns NULL */']
+            txt += self.mkActionFunc(action)
+            txt += ['{']
+            txt += ['    pPRIVATE_DATA self = (pPRIVATE_DATA) pPrivate;']
+            txt += ['    /* BEGIN CUSTOM: action code */']
+            txt += ['    return NULL;']
+            txt += ['    /* END CUSTOM: action code */']
+            txt += ['}']
+            txt += ['']
+        txt += ['void %s(void)' % self.mkFunc('ClassInit')]
         txt += ['{']
         for action in the_actions:
             txt += ['    %s(%s, %s);' % (self.mkFunc('ClassSetAction'), self.mkAction(action), action)]
@@ -815,19 +848,8 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['    return smi;']
         txt += ['}']
         txt += ['']
-        txt += ['typedef struct private_data_t PRIVATE_DATA, *pPRIVATE_DATA;']
-        txt += ['static struct private_data_t {']
-        txt += ['} private_data;']
-        txt += ['']
-        txt += ['static %s smi;' % self.mkName()]
-        txt += ['']
-        for action in the_actions:
-            txt += self.mkActionFunc(action)
-            txt += ['{']
-            txt += ['    pPRIVATE_DATA self = (pPRIVATE_DATA) pPrivate;']
-            txt += ['    return NULL;']
-            txt += ['}']
-            txt += ['']
+        txt += ['/* BEGIN CUSTOM: control code */']
+        txt += ['/* END CUSTOM: control code */']
         return ([], txt)
 
     def Generate_Code(self):
@@ -866,6 +888,7 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['    %s ev)' % (self.mkEvent())]
         txt += ['{']
         txt += ['    int i, j, k;']
+        txt += ['    int nTrans=0, nActns=0;']
         txt += ['    %s next_event = NULL;' % self.mkEvent()]
         txt += ['    %s next_state = smi->currentState;' % self.mkState()]
         txt += ['    const fsmStateMachine *fsm = smi->fsm;']
@@ -881,6 +904,7 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['                fsmTransTab *tab = &fsm->transTab[i];']
         txt += ['                fsmActionType actionType = tab->ac_type;']
         txt += ['                %s fn;' % self.mkFunc('Action')]
+        txt += ['                ++nTrans;']
         txt += ['                switch (actionType) {']
         txt += ['                    case fsmActionClass:']
         txt += ['                        k = tab->u.c.ac_class;']
@@ -888,27 +912,50 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['                        if (smi->actionTab && smi->actionTab[k])']
         txt += ['                            fn = smi->actionTab[k];']
         txt += ['                        next_event = (*fn)(smi, smi->currentState, ev, smi->pPrivate);']
+        txt += ['                        ++nActns;']
         txt += ['                        if (smi->reportFunc)']
-        txt += ['                            (*smi->reportFunc)(smi, "%s(%s) --> %s [%s]", smi->currentState->name, ev->name, next_event->name, action_pointers[k].name);']
+        txt += ['                            (*smi->reportFunc)(smi,']
+        txt += ['                                "%s(%s) --> %s [%s]",']
+        txt += ['                                smi->currentState->name,']
+        txt += ['                                ev->name,']
+        txt += ['                                next_event ? next_event->name : "<no next event>",']
+        txt += ['                                action_pointers[k].name);']
         txt += ['                        ev = next_event;']
         txt += ['                        break;']
         txt += ['                    case fsmActionTrans:']
         txt += ['                        if (tab->u.t.so)']
         txt += ['                            next_state = tab->u.t.so;']
         txt += ['                        for (j = 0; j < tab->u.t.ac_count; ++ j) {']
+        txt += ['                            ++nActns;']
         txt += ['                            k = fsm->actTab[tab->u.t.ac_start + j]->index;']
         txt += ['                            fn = fsm->actionTab[k];']
         txt += ['                            if (smi->actionTab && smi->actionTab[k])']
         txt += ['                                fn = smi->actionTab[k];']
         txt += ['                            (void) (*fn)(smi, smi->currentState, ev, smi->pPrivate);']
         txt += ['                            if (smi->reportFunc)']
-        txt += ['                                (*smi->reportFunc)(smi, "%s(%s) [%s]", smi->currentState->name, ev->name, action_pointers[k].name);']
+        txt += ['                                (*smi->reportFunc)(smi,']
+        txt += ['                                    "%s(%s) [%s]",']
+        txt += ['                                    smi->currentState->name,']
+        txt += ['                                    ev->name,']
+        txt += ['                                    action_pointers[k].name);']
         txt += ['                        }']
+        txt += ['                        if (nActns == 0) /* no actions reported */']
+        txt += ['                            if (smi->reportFunc)']
+        txt += ['                                (*smi->reportFunc)(smi,']
+        txt += ['                                    "%s(%s) [<no actions>]",']
+        txt += ['                                    smi->currentState->name,']
+        txt += ['                                    ev->name);']
         txt += ['                        break;']
         txt += ['                }']
         txt += ['                break;']
         txt += ['            }']
         txt += ['        }']
+        txt += ['        if (nTrans == 0) /* event not handled */']
+        txt += ['            if (smi->reportFunc)']
+        txt += ['                (*smi->reportFunc)(smi,']
+        txt += ['                    "%s(%s) [<unhandled>]",']
+        txt += ['                    smi->currentState->name,']
+        txt += ['                    ev->name);']
         txt += ['    } while (next_event);']
         txt += ['    return next_state;']
         txt += ['}']
@@ -923,7 +970,10 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['            %s(smi, smi->fsm->exitEvent);'\
                 % self.mkFunc('RunStateEvent')]
         txt += ['        if (smi->reportFunc)']
-        txt += ['            (*smi->reportFunc)(smi, "%s ==> %s", smi->currentState->name, next_state->name);']
+        txt += ['            (*smi->reportFunc)(smi,']
+        txt += ['                "%s ==> %s",']
+        txt += ['                smi->currentState->name,']
+        txt += ['                next_state->name);']
         txt += ['        smi->currentState = next_state;']
         txt += ['        if (smi->fsm->entryEvent)']
         txt += ['            next_state = %s(smi, smi->fsm->entryEvent);'\
@@ -954,8 +1004,10 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['    }']
         txt += ['}']
         hdr += ['', '/* Report Function accessors */']
-        txt += ['void %s(%s smi, void (*reportFunc)(%s smi, const char *fmt, ...))'\
-                % (self.mkFunc('SetReportFunc'), self.mkName(), self.mkName())]
+        txt += ['void %s(%s smi,'\
+                % (self.mkFunc('SetReportFunc'), self.mkName())]
+        txt += ['    void (*reportFunc)(%s smi, const char *fmt, ...))'\
+                % (self.mkName())]
         txt += ['{']
         txt += ['    smi->reportFunc = reportFunc;']
         txt += ['}']
@@ -968,6 +1020,10 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['void *%s(%s smi)' % (self.mkFunc('GetPrivate'), self.mkName())]
         txt += ['{']
         txt += ['    return smi->pPrivate;']
+        txt += ['}']
+        txt += ['const char *%s(%s smi)' % (self.mkFunc('GetName'), self.mkName())]
+        txt += ['{']
+        txt += ['    return smi->name;']
         txt += ['}']
         return (hdr, txt)
 

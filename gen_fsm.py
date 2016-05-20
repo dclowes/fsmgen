@@ -41,8 +41,10 @@ def FormatEvent(event):
 def Build_StateMachine(sm):
     new_sm = statemachine.StateMachine(sm['Name'])
     the_states = sorted(sm['States'])
+    the_bases = sorted(sm['Inherits'])
     if Verbose:
         print '**The States:', the_states
+        print '**The Bases:', the_bases
     for s in the_states:
         if s in sm['Inherits']:
             new_sm.addState(statemachine.State(s, sm['Inherits'][s]))
@@ -425,6 +427,7 @@ def p_state_code(p):
 def p_state_code_1(p): # Classifier
     '''
     state_code_1 : event_type CLASSIFIER id_or_str TRANSITION event_list
+                 | event_type DISPATCH id_or_str CLASSIFIER event_list
     '''
     p[0] = [1, p[1], [p[3]], p[5]]
 
