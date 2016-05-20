@@ -47,9 +47,10 @@ def Build_StateMachine(sm):
         print '**The Bases:', the_bases
     for s in the_states:
         if s in sm['Inherits']:
-            new_sm.addState(statemachine.State(s, sm['Inherits'][s]))
+            state = statemachine.State(s, sm['Inherits'][s])
         else:
-            new_sm.addState(statemachine.State(s))
+            state = statemachine.State(s)
+        new_sm.addState(state)
     the_events = []
     for b in sm['Blocks']:
         if Verbose:
@@ -91,7 +92,12 @@ def Build_StateMachine(sm):
     the_events = sorted(the_events)
     if Verbose:
         print '**The Events:', [FormatEvent(e) for e in the_events]
-
+    for s in new_sm.states:
+        if s.name in sm['State_Comments']:
+            s.comments += sm['State_Comments'][s.name]
+    for e in new_sm.events:
+        if e.name in sm['Event_Comments']:
+            e.comments += sm['Event_Comments'][e.name]
     if Verbose:
         new_sm.printit()
     return new_sm
@@ -360,8 +366,15 @@ def p_state_list(p):
 def p_state_type(p):
     '''
     state_type : id_or_str
+               | state_type text_string
     '''
     p[0] = p[1]
+    if p[1] not in Statemachine['States']:
+        Statemachine['States'].append(p[1])
+    if len(p) > 2:
+        if p[1] not in Statemachine['State_Comments']:
+            Statemachine['State_Comments'][p[1]] = []
+        Statemachine['State_Comments'][p[1]].append(p[2])
 
 def p_event_list(p):
     '''
@@ -369,7 +382,7 @@ def p_event_list(p):
                | event_list COMMA event_type
     '''
     ReportP(p, "event_list")
-    if len(p) > 3:
+    if len(p) == 4:
         if p[3] not in Statemachine['Events']:
             Statemachine['Events'].append(p[3])
         p[0] = p[1] + [p[3]]
@@ -382,11 +395,17 @@ def p_event_type(p):
     '''
     event_type : id_or_str
                | id_or_str LPAREN id_list RPAREN
+               | event_type text_string
     '''
-    if len(p) > 2:
-        p[0] = [p[1], p[3]]
-    else:
+    if len(p) == 2:
         p[0] = [p[1], []]
+    elif len(p) == 5:
+        p[0] = [p[1], p[3]]
+    elif len(p) == 3:
+        p[0] = p[1]
+        if p[1][0] not in Statemachine['Event_Comments']:
+            Statemachine['Event_Comments'][p[1][0]] = []
+        Statemachine['Event_Comments'][p[1][0]].append(p[2])
 
 def p_state_block(p):
     '''
@@ -575,7 +594,9 @@ def process_source(source_file):
     Statemachine = {}
     Statemachine['Filename'] = source_file
     Statemachine['States'] = []
+    Statemachine['State_Comments'] = {}
     Statemachine['Events'] = []
+    Statemachine['Event_Comments'] = {}
     Statemachine['Inherits'] = {}
     Statemachine['Blocks'] = {}
     Statemachine['Tests'] = []

@@ -19,6 +19,7 @@
 class Event(object):
     def __init__(self, name, arglist=None):
         self.name = name
+        self.comments = []
         self.arglist = arglist
     def __repr__(self):
         txt = self.name
@@ -34,6 +35,7 @@ class Event(object):
 class State(object):
     def __init__(self, name, base_list=None):
         self.name = name
+        self.comments = []
         if base_list == None:
             self.base_list = []
         else:
@@ -226,8 +228,36 @@ class StateMachine_Text(StateMachine):
         the_states = sorted([s.name for s in self.states])
         the_events = sorted([e.name for e in self.events])
         txt = ['STATEMACHINE %s {' % self.name]
-        txt += ['  STATES\n    %s;' % ',\n    '.join(the_states)]
-        txt += ['  EVENTS\n    %s;' % ',\n    '.join(the_events)]
+        txt += ['  STATES']
+        for state in the_states:
+            s = self.getState(state)
+            lines = ['    %s' % state]
+            if len(s.comments) == 0:
+                lines[0] += ' "No Comment"'
+            elif len(s.comments) == 1:
+                lines[0] += ' "%s"' %s.comments[0]
+            elif len(s.comments) > 1:
+                lines += ['      "%s"' % c for c in s.comments]
+            if state == the_states[-1]:
+                lines[-1] += ';'
+            else:
+                lines[-1] += ','
+            txt += lines
+        txt += ['  EVENTS']
+        for event in the_events:
+            e = self.getEvent(event)
+            lines = ['    %s' % event]
+            if len(e.comments) == 0:
+                lines[0] += ' "No Comment"'
+            elif len(e.comments) == 1:
+                lines[0] += ' "%s"' %e.comments[0]
+            elif len(e.comments) > 1:
+                lines += ['      "%s"' % c for c in e.comments]
+            if event == the_events[-1]:
+                lines[-1] += ';'
+            else:
+                lines[-1] += ','
+            txt += lines
         for state in the_states:
             s = self.getState(state)
             if s and len(s.base_list) > 0:
