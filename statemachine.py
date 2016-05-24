@@ -265,7 +265,6 @@ class StateMachine_Text(StateMachine):
             txt += lines
         txt += ['  ACTIONS']
         the_actions = sorted(self.action_list)
-        print "the_actions:", the_actions
         for action in the_actions:
             if action in self.action_comments:
                 comments = self.action_comments[action]
@@ -478,13 +477,70 @@ class StateMachine_HTML(StateMachine_Text):
                     for t in block.targets:
                         txt += ['    %s:%s -> %s:%s;' % (state, block.event, t, t)]
                 else:
-                    style = 'dir=both;arrowtail=inv;style=dotted;color=%s' % colors[idx]
+                    style = 'dir=both,arrowtail=inv,style=dotted,color=%s' % colors[idx]
                     idx += 1
                     if idx >= len(colors):
                         idx = 0
                     for t in block.targets:
                         if t[0] in [b.event for b in the_blocks]:
                             txt += ['    %s:%s -> %s:%s[%s];' % (state, block.event, state, t[0], style)]
+        txt += ['}']
+        return txt
+
+    def mkSource(self, block):
+        if len(block.actions) == 0:
+            return block.event
+        return block.event + '_source'
+
+    def mkTarget(self, block):
+        if len(block.actions) == 0:
+            return block.event
+        return block.event + '_target'
+
+    def DotStateMachine3(self):
+        target_map = {}
+        the_states = sorted([s.name for s in self.states])
+        txt = ['digraph G {']
+        txt += ['  size="11,8";']
+        txt += ['  ratio="expand";']
+        txt += ['  rankdir=LR;']
+        txt += ['  node [shape=plaintext];']
+        txt += ['  labelloc="t";']
+        txt += ['  label=<<B>%s</B>>' % self.name]
+        txt += ['']
+        colors = ['red', 'green', 'blue', 'orange', 'purple', 'magenta', 'cyan', 'yellow']
+        for state in the_states:
+            label = ['<TABLE>']
+            label += ['<TR><TD PORT="%s"><B>%s</B></TD></TR>' % (state, state)]
+            the_blocks = [b for b in sorted(self.classifiers) if b.source == state]
+            the_blocks += [b for b in sorted(self.transitions) if b.source == state]
+            idx = 0
+            for block in the_blocks:
+                target_text = self.mkTarget(block)
+                source_text = self.mkSource(block)
+                target_map["%s:%s" % (state, block.event)] = (target_text, source_text)
+                label += ['<TR><TD><TABLE>']
+                label += ['  <TR><TD PORT="%s"><B>%s</B></TD></TR>' % (self.mkTarget(block), block.event)]
+                for (n, a) in enumerate(block.actions):
+                    if n < len(block.actions) - 1:
+                        label += ['    <TR><TD>%s</TD></TR>' % a]
+                    else:
+                        label += ['    <TR><TD PORT="%s">%s</TD></TR>' % (self.mkSource(block), a)]
+                label += ['</TABLE></TD></TR>']
+            label += ['</TABLE>']
+            txt += ['  %s[label=<%s>];' % (state, '\n    '.join(label))]
+            for block in the_blocks:
+                if isinstance(block, Transition):
+                    for t in block.targets:
+                        txt += ['    %s:%s -> %s:%s;' % (state, self.mkSource(block), t, t)]
+                else:
+                    style = 'dir=both,arrowtail=inv,style=dotted,color=%s' % colors[idx]
+                    idx += 1
+                    if idx >= len(colors):
+                        idx = 0
+                    for t in block.targets:
+                        for b in [b for b in the_blocks if t[0] == b.event]:
+                            txt += ['    %s:%s -> %s:%s[%s];' % (state, self.mkSource(block), state, self.mkTarget(b), style)]
         txt += ['}']
         return txt
 
@@ -849,8 +905,8 @@ class StateMachine_GCC(StateMachine_Text):
         txt = []
         txt += ['#include "%s.fsm.h"' % self.name]
         txt += ['#include <stdlib.h>']
-        txt += ['/* BEGIN CUSTOM: include files */']
-        txt += ['/* END CUSTOM: include files */']
+        txt += ['/* BEGIN CUSTOM: include files {{{*/']
+        txt += ['/* END CUSTOM: include files }}}*/']
         txt += ['']
         the_blocks = [b for b in self.classifiers + self.transitions]
         the_actions = []
@@ -866,8 +922,9 @@ class StateMachine_GCC(StateMachine_Text):
 #        txt += ['']
         txt += ['typedef %s_PRIVATE_DATA *pPRIVATE_DATA;' % self.mkName()]
         txt += ['']
-        txt += ['/* BEGIN CUSTOM: forward declarations */']
-        txt += ['/* END CUSTOM: forward declarations */']
+        txt += ['/* BEGIN CUSTOM: forward declarations {{{*/']
+        txt += ['/* Place forward declarations, used in the action code, here */']
+        txt += ['/* END CUSTOM: forward declarations }}}*/']
         txt += ['']
         for action in the_actions:
             (result, targets) = self.isClassifier(action)
@@ -877,20 +934,31 @@ class StateMachine_GCC(StateMachine_Text):
                     txt += ['/*    %s */' % self.mkEvent(target[0])]
             else:
                 txt += ['/* Transition: returns NULL */']
+            if action in self.action_comments:
+                txt += ['/* Comments: */']
+                for line in self.action_comments[action]:
+                    txt += ['/*    %s */' % line]
             txt += self.mkActionFunc(action)
             txt += ['{']
             txt += ['    pPRIVATE_DATA self = (pPRIVATE_DATA) pPrivate;']
-            txt += ['    /* BEGIN CUSTOM: action code */']
+            txt += ['    /* BEGIN CUSTOM: action code {{{*/']
             txt += ['    return NULL;']
-            txt += ['    /* END CUSTOM: action code */']
+            txt += ['    /* END CUSTOM: action code }}}*/']
             txt += ['}']
             txt += ['']
+        txt += ['/*']
+        txt += [' * Initialize the Class to use these functions']
+        txt += [' */']
         txt += ['void %s(void)' % self.mkFunc('ClassInit')]
         txt += ['{']
         for action in the_actions:
             txt += ['    %s(%s, %s);' % (self.mkFunc('ClassSetAction'), self.mkAction(action), action)]
         txt += ['}']
         txt += ['']
+        txt += ['/*']
+        txt += [' * Example function to construct the instance']
+        txt += [' * Aslo sets the private data and private destructor (or NULL)']
+        txt += [' */']
         txt += ['static %s make(' % self.mkName()]
         txt += ['    char *name,']
         txt += ['    %s initialState,' % self.mkState()]
@@ -903,8 +971,36 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['    return smi;']
         txt += ['}']
         txt += ['']
-        txt += ['/* BEGIN CUSTOM: control code */']
-        txt += ['/* END CUSTOM: control code */']
+        txt += ['/* BEGIN CUSTOM: control code {{{*/']
+        txt += ['/* Place function definitions, used in the action code, here */']
+        txt += ['']
+        txt += ['#ifdef UNIT_TEST']
+        txt += ['/* Place unit test code here */']
+        txt += ['']
+        txt += ['/* Place unit test code main code here */']
+        txt += ['int main(int argc, char *argv[])']
+        txt += ['{']
+        txt += ['    %s smi;' % self.mkName()]
+        txt += ['    %s_PRIVATE_DATA private_data;' % self.mkName()]
+        txt += ['']
+        txt += ['    %s();' % self.mkFunc('ClassInit')]
+        txt += ['    memset(&private_data, 0, sizeof(private_data));']
+        txt += ['    smi = make(']
+        txt += ['        "test", %s,' % self.mkState('')]
+        txt += ['        &private_data, NULL);']
+        txt += ['    %s(smi,' % self.mkFunc('SetReportFunc')]
+        txt += ['        NULL);']
+        txt += ['    /* TODO: test something */']
+        txt += ['    %s(smi);' % self.mkFunc('InstanceKill')]
+        txt += ['    return EXIT_SUCCESS;']
+        txt += ['}']
+        txt += ['']
+        txt += ['#endif /* UNIT_TEST */']
+        txt += ['']
+        txt += ['/*']
+        txt += [' * vim: ft=c ts=8 sts=4 sw=4 et cindent']
+        txt += [' */']
+        txt += ['/* END CUSTOM: control code }}}*/']
         return ([], txt)
 
     def Generate_Code(self):

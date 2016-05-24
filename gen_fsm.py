@@ -429,9 +429,9 @@ def p_action_type(p):
     if p[0] not in Statemachine['Actions']:
         Statemachine['Actions'].append(p[0])
     if len(p) == 3:
-        if p[0][0] not in Statemachine['Action_Comments']:
-            Statemachine['Action_Comments'][p[0][0]] = []
-        Statemachine['Action_Comments'][p[0][0]].append(p[2])
+        if p[0] not in Statemachine['Action_Comments']:
+            Statemachine['Action_Comments'][p[0]] = []
+        Statemachine['Action_Comments'][p[0]].append(p[2])
 
 def p_state_block(p):
     '''
@@ -651,7 +651,7 @@ def generate_source(the_fsm, SourceData, source_file):
     fsm_tcl = statemachine.StateMachine_TCL(the_fsm)
     fsm_python = statemachine.StateMachine_Python(the_fsm)
     fsm_gcc = statemachine.StateMachine_GCC(the_fsm)
-    txt_dot = fsm_html.DotStateMachine2()
+    txt_dot = fsm_html.DotStateMachine3()
     with open("%s.dot" % dest_file, "w") as fdo:
         fdo.write('\n'.join(txt_dot))
     dot_cmd = "%s -Tsvg -o %s.svg %s.dot" % (args.dot, dest_file, dest_file)
