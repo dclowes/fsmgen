@@ -823,6 +823,7 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['    %s smi,' % self.mkName()]
         txt += ['    %s state,' % self.mkState()]
         txt += ['    %s event,' % self.mkEvent()]
+        txt += ['    void *pContext,']
         txt += ['    void *pPrivate)']
         return txt
 
@@ -863,6 +864,7 @@ class StateMachine_GCC(StateMachine_Text):
         hdr += ['    %s smi,' % self.mkName()]
         hdr += ['    %s state,' % self.mkState()]
         hdr += ['    %s event,' % self.mkEvent()]
+        hdr += ['    void *pContext,']
         hdr += ['    void *pPrivate);']
         # Constructor
         hdr += ['', '/* Statemachine Instance Constructor */']
@@ -871,7 +873,7 @@ class StateMachine_GCC(StateMachine_Text):
         hdr += ['', '/* Statemachine Instance Destructor */']
         hdr += ['void %s(%s smi);' % (self.mkName('InstanceKill'), self.mkFunc())]
         hdr += ['', '/* Statemachine Instance Driver */']
-        hdr += ['void %s(%s smi, %s ev);'\
+        hdr += ['void %s(%s smi, %s ev, void *pContext);'\
                 % (self.mkFunc('InstanceRun'), self.mkName(), self.mkEvent())]
         #
         hdr += ['', '/* Statemachine Class Action Setter */']
@@ -1038,8 +1040,10 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['}']
         txt += ['']
         txt += ['/* Run one Event for this Instance of this Statemachine */']
-        txt += ['static %s %s(%s smi,' % (self.mkState(), self.mkFunc('RunStateEvent'), self.mkName())]
-        txt += ['    %s ev)' % (self.mkEvent())]
+        txt += ['static %s %s('% (self.mkState(), self.mkFunc('RunStateEvent'))]
+        txt += ['    %s smi,' % (self.mkName())]
+        txt += ['    %s ev,' % (self.mkEvent())]
+        txt += ['    void *pContext)']
         txt += ['{']
         txt += ['    int i, j, k;']
         txt += ['    int nTrans=0, nActns=0;']
@@ -1071,7 +1075,7 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['                                smi->currentState->name,']
         txt += ['                                ev->name,']
         txt += ['                                action_pointers[k].name);']
-        txt += ['                        next_event = (*fn)(smi, smi->currentState, ev, smi->pPrivate);']
+        txt += ['                        next_event = (*fn)(smi, smi->currentState, ev, pContext, smi->pPrivate);']
         txt += ['                        ++nActns;']
         txt += ['                        ev = next_event;']
         txt += ['                        break;']
@@ -1090,7 +1094,7 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['                                    smi->currentState->name,']
         txt += ['                                    ev->name,']
         txt += ['                                    action_pointers[k].name);']
-        txt += ['                            (void) (*fn)(smi, smi->currentState, ev, smi->pPrivate);']
+        txt += ['                            (void) (*fn)(smi, smi->currentState, ev, pContext, smi->pPrivate);']
         txt += ['                        }']
         txt += ['                        if (nActns == 0) /* no actions reported */']
         txt += ['                            if (smi->reportFunc)']
@@ -1113,14 +1117,14 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['    return next_state;']
         txt += ['}']
         txt += ['']
-        txt += ['void %s(%s smi, %s ev)'\
+        txt += ['void %s(%s smi, %s ev, void *pContext)'\
                 % (self.mkFunc('InstanceRun'), self.mkName(), self.mkEvent())]
         txt += ['{']
-        txt += ['    %s next_state = %s(smi, ev);'\
+        txt += ['    %s next_state = %s(smi, ev, pContext);'\
                 % (self.mkState(), self.mkFunc('RunStateEvent'))]
         txt += ['    while (next_state != smi->currentState) {']
         txt += ['        if (smi->fsm->exitEvent)']
-        txt += ['            %s(smi, smi->fsm->exitEvent);'\
+        txt += ['            %s(smi, smi->fsm->exitEvent, pContext);'\
                 % self.mkFunc('RunStateEvent')]
         txt += ['        if (smi->reportFunc)']
         txt += ['            (*smi->reportFunc)(smi,']
@@ -1129,7 +1133,7 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['                next_state->name);']
         txt += ['        smi->currentState = next_state;']
         txt += ['        if (smi->fsm->entryEvent)']
-        txt += ['            next_state = %s(smi, smi->fsm->entryEvent);'\
+        txt += ['            next_state = %s(smi, smi->fsm->entryEvent, pContext);'\
                 % self.mkFunc('RunStateEvent')]
         txt += ['    }']
         txt += ['}']
@@ -1451,6 +1455,7 @@ class StateMachine_GCC(StateMachine_Text):
             txt += ['        %s smi,' % self.mkName()]
             txt += ['        %s state,' % self.mkState()]
             txt += ['        %s event,' % self.mkEvent()]
+            txt += ['        void *pContext,']
             txt += ['        void *pPrivate)']
             txt += ['{']
             if action in classifier_list:
@@ -1479,7 +1484,7 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['                fsmTransTab *tab = &trans_table[idx];']
         txt += ['                if (tab->si->index == state && tab->ei->index == event) {']
         txt += ['                    smi->currentState = &state_pointers[state];']
-        txt += ['                    %s(smi, &event_pointers[event]);' % self.mkFunc('InstanceRun')]
+        txt += ['                    %s(smi, &event_pointers[event], NULL);' % self.mkFunc('InstanceRun')]
         txt += ['                    if (smi->currentState->index != state)']
         txt += ['                        printf("       %s ===> %s\\n", state_names[state], smi->currentState->name);']
         txt += ['                }']
@@ -1495,7 +1500,7 @@ class StateMachine_GCC(StateMachine_Text):
                     txt += ['            break;']
                     txt += ['        }']
                 else:
-                    txt += ['        %s(smi, %s);' % (self.mkFunc('InstanceRun'), self.mkEvent(t))]
+                    txt += ['        %s(smi, %s, NULL);' % (self.mkFunc('InstanceRun'), self.mkEvent(t))]
             txt += ['        printf("Test Passed: %s\\n");' % repr(test)]
             txt += ['    } while (0);']
         txt += ['    %s(smi);' % (self.mkFunc('InstanceKill'))]
