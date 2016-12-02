@@ -36,7 +36,7 @@ class State(object):
     def __init__(self, name, base_list=None):
         self.name = name
         self.comments = []
-        if base_list == None:
+        if base_list is None:
             self.base_list = []
         else:
             self.base_list = base_list
@@ -95,6 +95,7 @@ class StateMachine(object):
         self.classifiers = []
         self.action_list = []
         self.action_comments = {}
+        self.outputs = []
 
     def __repr__(self):
         text = "name = %s" % repr(self.name)
@@ -186,6 +187,7 @@ class StateMachine_Text(StateMachine):
             return
         # Copy from the other one
         self.name = other.name[:]
+        self.outputs = other.outputs[:]
         self.actions = other.actions[:]
         self.events = other.events[:]
         self.states = other.states[:]
@@ -233,6 +235,8 @@ class StateMachine_Text(StateMachine):
         the_states = sorted([s.name for s in self.states])
         the_events = sorted([e.name for e in self.events])
         txt = ['STATEMACHINE %s {' % self.name]
+        if len(self.outputs) > 0:
+            txt += ['  OUPUT ' + ', '.join(self.outputs) + ';']
         txt += ['  STATES']
         for state in the_states:
             s = self.getState(state)
@@ -785,6 +789,28 @@ class StateMachine_TCL(StateMachine_Text):
         txt += ['}']
         return txt
 
+class StateMachine_UML(StateMachine_Text):
+    def __init__(self, other):
+        StateMachine_Text.__init__(self, other)
+        self.Inheritance()
+
+    def Generate(self):
+        the_states = sorted([s.name for s in self.states])
+        txt = ['@startuml']
+        for state in the_states:
+            txt += ['state %s' % state]
+        txt += ['']
+        for state in the_states:
+            the_blocks = [b for b in sorted(self.classifiers) if b.source == state]
+            for block in the_blocks:
+                txt += ['%s --> %s : %s' % (state, state, block.event)]
+            the_blocks = [b for b in sorted(self.transitions) if b.source == state]
+            for block in the_blocks:
+                for t in block.targets:
+                    txt += ['%s --> %s : %s' % (state, t, block.event)]
+        txt += ['@enduml']
+        return txt
+
 class StateMachine_GCC(StateMachine_Text):
     def __init__(self, other):
         StateMachine_Text.__init__(self, other)
@@ -1254,92 +1280,8 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['}']
         return (hdr, txt)
 
-    def Generate_C(self):
-        the_states = sorted([s.name for s in self.states])
-        the_events = sorted([e.name for e in self.events])
-        the_actions = []
-        classifier_list = {}
-        the_blocks = [b for b in self.classifiers + self.transitions]
-        max_actions = 0
-        for block in the_blocks:
-            if len(block.actions) > max_actions:
-                max_actions = len(block.actions)
-            for action in block.actions:
-                if action not in the_actions:
-                    the_actions.append(action)
-        the_actions = sorted(the_actions)
-        tkns = []
-        tkns += [('NUM_STATES', len(the_states))]
-        tkns += [('NUM_EVENTS', len(the_events))]
-        tkns += [('NUM_TRANS', len(the_blocks))]
-        tkns += [('NUM_ACTIONS', len(the_actions))]
-        tkns += [('MAX_ACTIONS', max_actions)]
-        stts = []
-        for idx, state in enumerate(the_states):
-            stts += [(state, idx + 1)]
-        evts = []
-        for idx, event in enumerate(the_events):
-            evts += [(event, idx + 1)]
-        acts = []
-        for idx, action in enumerate(the_actions):
-            acts += [(action, idx + 1)]
-        # print "tkns:", tkns
-        # print "stts:", stts
-        # print "evts:", evts
-        # print "acts:", acts
-
-        hdr = self.Generate_Hdr(stts, evts, acts)
-
+    def Generate_Actions(self, acts):
         txt = []
-        txt += ['#include <stdlib.h>']
-        txt += ['#include <stdio.h>']
-        txt += ['#include <string.h>']
-        txt += ['']
-        for item in tkns:
-            txt += ['#define %s %d'\
-                    % (self.mkName(item[0]), item[1])]
-        txt += ['']
-        # States
-        txt += ['', '/* States */']
-        txt += ['struct %s_t {' % self.mkState()]
-        txt += ['    char *name;']
-        txt += ['    int  index;']
-        txt += ['};']
-        txt += ['enum {']
-        for item in stts:
-            txt += ['    e%s = %s,' % (self.mkState(item[0]), item[1])]
-        txt += ['};']
-        txt += ['static const struct %s_t state_pointers [] = {' % self.mkState()]
-        txt += ['    { NULL, %s },' % self.mkName('NUM_STATES')]
-        for item in stts:
-            txt += ['    { "%s", %d },'\
-                    % (item[0], item[1])]
-        txt += ['    { NULL, 0 }']
-        txt += ['};']
-        for item in stts:
-            txt += ['const %s %s = &state_pointers[%d];'\
-                    % (self.mkState(), self.mkState(item[0]), item[1])]
-        # Events
-        txt += ['', '/* Events */']
-        txt += ['struct %s_t {' % self.mkEvent()]
-        txt += ['    char *name;']
-        txt += ['    int  index;']
-        txt += ['};']
-        txt += ['enum {']
-        for item in evts:
-            txt += ['    e%s = %s,' % (self.mkEvent(item[0]), item[1])]
-        txt += ['};']
-        txt += ['static const struct %s_t event_pointers [] = {' % self.mkEvent()]
-        txt += ['    { NULL, %s },' % self.mkName('NUM_EVENTS')]
-        for item in evts:
-            txt += ['    { "%s", %d },'\
-                    % (item[0], item[1])]
-        txt += ['    { NULL, 0 }']
-        txt += ['};']
-        for item in evts:
-            txt += ['const %s %s = &event_pointers[%d];'\
-                    % (self.mkEvent(), self.mkEvent(item[0]), item[1])]
-        # Actions
         txt += ['', '/* Actions */']
         txt += ['struct %s_t {' % self.mkAction()]
         txt += ['    char *name;']
@@ -1359,8 +1301,57 @@ class StateMachine_GCC(StateMachine_Text):
         for item in acts:
             txt += ['const %s %s = &action_pointers[%d];'\
                     % (self.mkAction(), self.mkAction(item[0]), item[1])]
-        #
-        txt += ['']
+        return txt
+
+    def Generate_Events(self, evts):
+        txt = []
+        txt += ['', '/* Events */']
+        txt += ['struct %s_t {' % self.mkEvent()]
+        txt += ['    char *name;']
+        txt += ['    int  index;']
+        txt += ['};']
+        txt += ['enum {']
+        for item in evts:
+            txt += ['    e%s = %s,' % (self.mkEvent(item[0]), item[1])]
+        txt += ['};']
+        txt += ['static const struct %s_t event_pointers [] = {' % self.mkEvent()]
+        txt += ['    { NULL, %s },' % self.mkName('NUM_EVENTS')]
+        for item in evts:
+            txt += ['    { "%s", %d },'\
+                    % (item[0], item[1])]
+        txt += ['    { NULL, 0 }']
+        txt += ['};']
+        for item in evts:
+            txt += ['const %s %s = &event_pointers[%d];'\
+                    % (self.mkEvent(), self.mkEvent(item[0]), item[1])]
+        return txt
+
+    def Generate_States(self, stts):
+        txt = []
+        txt += ['', '/* States */']
+        txt += ['struct %s_t {' % self.mkState()]
+        txt += ['    char *name;']
+        txt += ['    int  index;']
+        txt += ['};']
+        txt += ['enum {']
+        for item in stts:
+            txt += ['    e%s = %s,' % (self.mkState(item[0]), item[1])]
+        txt += ['};']
+        txt += ['static const struct %s_t state_pointers [] = {' % self.mkState()]
+        txt += ['    { NULL, %s },' % self.mkName('NUM_STATES')]
+        for item in stts:
+            txt += ['    { "%s", %d },'\
+                    % (item[0], item[1])]
+        txt += ['    { NULL, 0 }']
+        txt += ['};']
+        for item in stts:
+            txt += ['const %s %s = &state_pointers[%d];'\
+                    % (self.mkState(), self.mkState(item[0]), item[1])]
+        return txt
+
+    def Generate_Trans(self, the_states, the_events, the_blocks, classifier_list):
+        txt = []
+        txt += ['', '/* Transition Table Structures */']
         txt += ['typedef struct fsmTransTab_t fsmTransTab;']
         txt += ['typedef enum {']
         txt += ['    fsmActionClass = 1, /* Classifier Action Entry */']
@@ -1441,6 +1432,61 @@ class StateMachine_GCC(StateMachine_Text):
         txt += map_txt
         txt += tab_txt
         txt += ['']
+        return txt
+
+    def Generate_C(self):
+        the_states = sorted([s.name for s in self.states])
+        the_events = sorted([e.name for e in self.events])
+        the_actions = []
+        classifier_list = {}
+        the_blocks = [b for b in self.classifiers + self.transitions]
+        max_actions = 0
+        for block in the_blocks:
+            if len(block.actions) > max_actions:
+                max_actions = len(block.actions)
+            for action in block.actions:
+                if action not in the_actions:
+                    the_actions.append(action)
+        the_actions = sorted(the_actions)
+        tkns = []
+        tkns += [('NUM_STATES', len(the_states))]
+        tkns += [('NUM_EVENTS', len(the_events))]
+        tkns += [('NUM_TRANS', len(the_blocks))]
+        tkns += [('NUM_ACTIONS', len(the_actions))]
+        tkns += [('MAX_ACTIONS', max_actions)]
+        stts = []
+        for idx, state in enumerate(the_states):
+            stts += [(state, idx + 1)]
+        evts = []
+        for idx, event in enumerate(the_events):
+            evts += [(event, idx + 1)]
+        acts = []
+        for idx, action in enumerate(the_actions):
+            acts += [(action, idx + 1)]
+        # print "tkns:", tkns
+        # print "stts:", stts
+        # print "evts:", evts
+        # print "acts:", acts
+
+        hdr = self.Generate_Hdr(stts, evts, acts)
+
+        txt = []
+        txt += ['#include <stdlib.h>']
+        txt += ['#include <stdio.h>']
+        txt += ['#include <string.h>']
+        txt += ['']
+        for item in tkns:
+            txt += ['#define %s %d'\
+                    % (self.mkName(item[0]), item[1])]
+        txt += ['']
+        # States
+        txt += self.Generate_States(stts)
+        # Events
+        txt += self.Generate_Events(evts)
+        # Actions
+        txt += self.Generate_Actions(acts)
+        # Transition Table Structures
+        txt += self.Generate_Trans(the_states, the_events, the_blocks, classifier_list)
         txt += ['static char *state_names[] = {', '    0,']
         for state in the_states:
             txt += ['    "%s",' % self.mkState(state)]
@@ -1593,6 +1639,10 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['#endif /* UNIT_TEST */']
         return (hdr, txt)
 
+class StateMachine_GCC_2(StateMachine_GCC):
+    def __init__(self, other):
+        StateMachine_GCC.__init__(self, other)
+
 if __name__ == "__main__":
     print Event("test")
     print Event("test", ['with', 'args'])
@@ -1610,3 +1660,4 @@ if __name__ == "__main__":
     sm.addTransition(Transition("billState", "fredEvent", "do_something", "fredState"))
     sm.addClassifier(Classifier("billState", "fredEvent", "do_decide", "nextEvent"))
     sm.printit()
+
