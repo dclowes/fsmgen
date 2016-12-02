@@ -1281,8 +1281,8 @@ class StateMachine_GCC(StateMachine_Text):
         return (hdr, txt)
 
     def Generate_Actions(self, acts):
-        txt = []
-        txt += ['', '/* Actions */']
+        txt = ['']
+        txt += ['/* Actions */']
         txt += ['struct %s_t {' % self.mkAction()]
         txt += ['    char *name;']
         txt += ['    int  index;']
@@ -1291,6 +1291,7 @@ class StateMachine_GCC(StateMachine_Text):
         for item in acts:
             txt += ['    e%s = %s,' % (self.mkAction(item[0]), item[1])]
         txt += ['};']
+        txt += ['']
         txt += ['static const struct %s_t action_pointers [] = {' % self.mkAction()]
         txt += ['    { NULL, %s },' % self.mkName('NUM_ACTIONS')]
         for item in acts:
@@ -1298,22 +1299,31 @@ class StateMachine_GCC(StateMachine_Text):
                     % (item[0], item[1])]
         txt += ['    { NULL, 0 }']
         txt += ['};']
+        txt += ['']
         for item in acts:
             txt += ['const %s %s = &action_pointers[%d];'\
                     % (self.mkAction(), self.mkAction(item[0]), item[1])]
+        txt += ['']
+        txt += ['static char *action_names[] = {']
+        txt += ['    0,']
+        for item in acts:
+            txt += ['    "%s",' % self.mkAction(item[0])]
+        txt += ['    0', '};', '']
         return txt
 
     def Generate_Events(self, evts):
-        txt = []
-        txt += ['', '/* Events */']
+        txt = ['']
+        txt += ['/* Events */']
         txt += ['struct %s_t {' % self.mkEvent()]
         txt += ['    char *name;']
         txt += ['    int  index;']
         txt += ['};']
+        txt += ['']
         txt += ['enum {']
         for item in evts:
             txt += ['    e%s = %s,' % (self.mkEvent(item[0]), item[1])]
         txt += ['};']
+        txt += ['']
         txt += ['static const struct %s_t event_pointers [] = {' % self.mkEvent()]
         txt += ['    { NULL, %s },' % self.mkName('NUM_EVENTS')]
         for item in evts:
@@ -1321,22 +1331,31 @@ class StateMachine_GCC(StateMachine_Text):
                     % (item[0], item[1])]
         txt += ['    { NULL, 0 }']
         txt += ['};']
+        txt += ['']
         for item in evts:
             txt += ['const %s %s = &event_pointers[%d];'\
                     % (self.mkEvent(), self.mkEvent(item[0]), item[1])]
+        txt += ['']
+        txt += ['static char *event_names[] = {']
+        txt += ['    0,']
+        for item in evts:
+            txt += ['    "%s",' % self.mkEvent(item[0])]
+        txt += ['    0', '};', '']
         return txt
 
     def Generate_States(self, stts):
-        txt = []
-        txt += ['', '/* States */']
+        txt = ['']
+        txt += ['/* States */']
         txt += ['struct %s_t {' % self.mkState()]
         txt += ['    char *name;']
         txt += ['    int  index;']
         txt += ['};']
+        txt += ['']
         txt += ['enum {']
         for item in stts:
             txt += ['    e%s = %s,' % (self.mkState(item[0]), item[1])]
         txt += ['};']
+        txt += ['']
         txt += ['static const struct %s_t state_pointers [] = {' % self.mkState()]
         txt += ['    { NULL, %s },' % self.mkName('NUM_STATES')]
         for item in stts:
@@ -1344,9 +1363,15 @@ class StateMachine_GCC(StateMachine_Text):
                     % (item[0], item[1])]
         txt += ['    { NULL, 0 }']
         txt += ['};']
+        txt += ['']
         for item in stts:
             txt += ['const %s %s = &state_pointers[%d];'\
                     % (self.mkState(), self.mkState(item[0]), item[1])]
+        txt += ['']
+        txt += ['static char *state_names[] = {', '    0,']
+        for item in stts:
+            txt += ['    "%s",' % self.mkState(item[0])]
+        txt += ['    0', '};', '']
         return txt
 
     def Generate_Trans(self, the_states, the_events, the_blocks, classifier_list):
@@ -1478,7 +1503,7 @@ class StateMachine_GCC(StateMachine_Text):
         for item in tkns:
             txt += ['#define %s %d'\
                     % (self.mkName(item[0]), item[1])]
-        txt += ['']
+
         # States
         txt += self.Generate_States(stts)
         # Events
@@ -1487,18 +1512,6 @@ class StateMachine_GCC(StateMachine_Text):
         txt += self.Generate_Actions(acts)
         # Transition Table Structures
         txt += self.Generate_Trans(the_states, the_events, the_blocks, classifier_list)
-        txt += ['static char *state_names[] = {', '    0,']
-        for state in the_states:
-            txt += ['    "%s",' % self.mkState(state)]
-        txt += ['    0', '};', '']
-        txt += ['static char *event_names[] = {', '    0,']
-        for event in the_events:
-            txt += ['    "%s",' % self.mkEvent(event)]
-        txt += ['    0', '};', '']
-        txt += ['static char *action_names[] = {', '    0,']
-        for action in the_actions:
-            txt += ['    "%s",' % self.mkAction(action)]
-        txt += ['    0', '};', '']
         txt += ['']
         txt += ['static %s action_funcs[%s+1];' % (self.mkFunc('Action'), self.mkName('NUM_ACTIONS'))]
         txt += ['', '/* State Machine Class */']
@@ -1642,6 +1655,24 @@ class StateMachine_GCC(StateMachine_Text):
 class StateMachine_GCC_2(StateMachine_GCC):
     def __init__(self, other):
         StateMachine_GCC.__init__(self, other)
+
+    def Generate_Trans(self, the_states, the_events, the_blocks, classifier_list):
+        txt = StateMachine_GCC.Generate_Trans(self, the_states, the_events, the_blocks, classifier_list)
+        txt += ['#ifdef 0']
+        txt += ['struct fsmTransEvent {']
+        txt += ['  fsmTransTab tab[];']
+        txt += ['};']
+        txt += ['struct fsmTransState {']
+        txt += ['  fsmTransEvent event[%s + 1];' % self.mkName('NUM_EVENTS')]
+        txt += ['};']
+        for state in the_states:
+            txt += ['/* %s */' % self.mkState(state)]
+            txt += ['struct fsmTransState %s = {{0},' % self.mkState(state)]
+            for event in the_events:
+                txt += ['  {0}, /* %s */' % self.mkEvent(event)]
+            txt += ['};']
+        txt += ['#endif /* 0 */']
+        return txt
 
 if __name__ == "__main__":
     print Event("test")
