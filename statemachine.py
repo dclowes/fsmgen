@@ -68,13 +68,16 @@ class Classifier(object):
         return ", ".join([self.source, self.event, repr(self.actions), repr(self.targets)])
 
 class Action(object):
-    def __init__(self, name, code_type, code_text=None):
+    def __init__(self, name):
         self.name = name
-        self.code_type = code_type
-        self.code_text = code_text
+        self.comments = []
+        self.code_text = {}
 
     def __repr__(self):
-        return "%s(%s) {%s}" % (self.name, self.code_type, self.code_text)
+        if self.code_text:
+            return "%s {%s}" % (self.name, self.code_text)
+        else:
+            return "%s" % self.name
 
 class Test(object):
     def __init__(self, tests):
@@ -87,6 +90,7 @@ class StateMachine(object):
     def __init__(self, name):
         self.name = name
         self.uname = name.upper()
+        self.comments = []
         self.actions = []
         self.events = []
         self.states = []
@@ -94,7 +98,6 @@ class StateMachine(object):
         self.transitions = []
         self.classifiers = []
         self.action_list = []
-        self.action_comments = {}
         self.outputs = []
 
     def __repr__(self):
@@ -160,6 +163,12 @@ class StateMachine(object):
                 return s
         return None
 
+    def getAction(self, name):
+        for a in self.actions:
+            if a.name == name:
+                return a
+        return None
+
     def isClassifier(self, name):
         for item in self.classifiers:
             if name in item.actions:
@@ -187,6 +196,8 @@ class StateMachine_Text(StateMachine):
             return
         # Copy from the other one
         self.name = other.name[:]
+        self.dest_file = other.dest_file
+        self.comments = other.comments[:]
         self.outputs = other.outputs[:]
         self.actions = other.actions[:]
         self.events = other.events[:]
@@ -195,7 +206,6 @@ class StateMachine_Text(StateMachine):
         self.transitions = other.transitions[:]
         self.classifiers = other.classifiers[:]
         self.action_list = other.action_list[:]
-        self.action_comments = other.action_comments
 
     def Inheritance(self):
         '''
@@ -268,13 +278,10 @@ class StateMachine_Text(StateMachine):
                 lines[-1] += ','
             txt += lines
         txt += ['  ACTIONS']
-        the_actions = sorted(self.action_list)
+        the_actions = sorted(self.actions)
         for action in the_actions:
-            if action in self.action_comments:
-                comments = self.action_comments[action]
-            else:
-                comments = []
-            lines = ['    %s' % action]
+            comments = action.comments
+            lines = ['    %s' % action.name]
             if len(comments) == 0:
                 lines[0] += ' "No Comment"'
             elif len(comments) == 1:
@@ -310,13 +317,14 @@ class StateMachine_Text(StateMachine):
             txt += ['  }']
         for action in sorted(self.actions, key=lambda action: action.name.lower()):
             # print "##Action:", action
-            txt += ['  CODE %s %s {' % (action.code_type, action.name)]
-            for action_item in action.code_text:
-                txt += ['    @%s' % action_item[0]]
-                for line in action_item[1]:
-                    txt += [line]
-                txt += ['    @END']
-            txt += ['  }']
+            if len(action.code_text) > 0:
+                txt += ['  CODE %s {' % (action.name)]
+                for code_type in sorted(action.code_text):
+                    txt += ['    @%s' % code_type]
+                    for line in action.code_text[code_type]:
+                        txt += [line]
+                    txt += ['    @END']
+                txt += ['  }']
         for test in self.tests:
             txt += ['  Test %s;' % ',\n    '.join(test.tests)]
         txt += ['}']
@@ -650,7 +658,7 @@ class StateMachine_Python(StateMachine_Text):
             txt += ['    print "Test Passed: %s"' % repr(test)]
         txt2 = ['else:']
         for action in action_list:
-            the_blocks = [b for b in self.actions if b.name == action and b.code_type == 'action']
+            the_blocks = [b for b in self.actions if b.name == action and 'action' in b.code_text]
             if len(the_blocks) == 0:
                 continue
             txt2 += ['    def %s (context, state, event):' % action]
@@ -768,7 +776,7 @@ class StateMachine_TCL(StateMachine_Text):
             txt += ['    puts "Test Passed: %s"' % repr(test)]
         txt2 = ['} else {']
         for action in action_list:
-            the_blocks = [b for b in self.actions if b.name == action and b.code_type == 'action']
+            the_blocks = [b for b in self.actions if b.name == action and 'action' in b.code_text]
             if len(the_blocks) == 0:
                 continue
             txt2 += ['    proc %s {context state event} {' % action]
@@ -965,9 +973,10 @@ class StateMachine_GCC(StateMachine_Text):
                     txt += ['/*    %s */' % self.mkEvent(target[0])]
             else:
                 txt += ['/* Transition: returns NULL */']
-            if action in self.action_comments:
+            a = self.getAction(action)
+            if a and len(a.comments) > 0:
                 txt += ['/* Comments: */']
-                for line in self.action_comments[action]:
+                for line in a.comments:
                     txt += ['/*    %s */' % line]
             txt += self.mkActionFunc(action)
             txt += ['{']
@@ -1658,6 +1667,7 @@ class StateMachine_GCC_2(StateMachine_GCC):
 
     def Generate_Trans(self, the_states, the_events, the_blocks, classifier_list):
         txt = StateMachine_GCC.Generate_Trans(self, the_states, the_events, the_blocks, classifier_list)
+        return txt
         txt += ['#ifdef 0']
         txt += ['struct fsmTransEvent {']
         txt += ['  fsmTransTab tab[];']
@@ -1673,6 +1683,53 @@ class StateMachine_GCC_2(StateMachine_GCC):
             txt += ['};']
         txt += ['#endif /* 0 */']
         return txt
+
+class StateMachine_SQL(StateMachine_Text):
+    def __init__(self, other):
+        StateMachine_Text.__init__(self, other)
+        self.Inheritance()
+
+    def Generate(self):
+        import os
+        import sqlite3
+        dest_file = "%s.sqlite" % self.dest_file
+        if os.path.exists(dest_file):
+            os.remove(dest_file)
+        conn = sqlite3.connect(dest_file)
+        curs = conn.cursor()
+        curs.execute("CREATE TABLE statemachine (name TEXT, comments TEXT)")
+        curs.execute("CREATE TABLE states (name TEXT, bases TEXT, comments TEXT)")
+        curs.execute("CREATE TABLE events (name TEXT, comments TEXT)")
+        curs.execute("CREATE TABLE actions (name TEXT, comments TEXT)")
+        curs.execute("CREATE TABLE code (name TEXT, type TEXT, lines TEXT)")
+        curs.execute("CREATE TABLE blocks (state TEXT, event TEXT, actions TEXT, targets TEXT)")
+        curs.execute("CREATE TABLE tests (test TEXT)")
+
+        curs.execute("INSERT INTO statemachine VALUES (:1, :2)", (self.name, "\n".join(self.comments)))
+        for s in sorted(self.states, key=lambda state: state.name):
+            curs.execute("INSERT INTO states VALUES (:1, :2, :3)",
+                         (s.name,
+                          "\n".join(s.base_list),
+                          "\n".join(s.comments)))
+        for e in sorted(self.events, key=lambda event: event.name):
+            curs.execute("INSERT INTO events VALUES (:1, :2)",
+                         (e.name,
+                          "\n".join(e.comments)))
+        for a in sorted(self.actions, key=lambda action: action.name):
+            curs.execute("INSERT INTO actions VALUES (:1, :2)",
+                         (a.name,
+                          "\n".join(a.comments)))
+        for block in sorted(self.transitions, key=lambda block: (block.source, block.event)):
+            curs.execute("INSERT INTO blocks VALUES (:1, :2, :3, :4)",
+                         (block.source,
+                          block.event,
+                          "\n".join(block.actions),
+                          "\n".join(block.targets)))
+        for test in self.tests:
+            curs.execute("INSERT INTO tests VALUES (:1)",
+                         ("\n".join(a.tests)))
+        conn.commit()
+
 
 if __name__ == "__main__":
     print Event("test")

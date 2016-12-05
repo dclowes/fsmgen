@@ -80,12 +80,14 @@ def Build_StateMachine(sm):
                         new_sm.addEvent(statemachine.Event(e[0], the_args))
             else:
                 new_sm.addTransition(statemachine.Transition(b, t[1][0], t[2], t[3]))
-    for c in sm['Code']:
-        code = sm['Code'][c]
-        if Verbose:
-            print "**The Code:", c, code
-        action = statemachine.Action(code['name'], code['type'], code['text'])
+    for a in sorted(sm['Actions']):
+        action = statemachine.Action(a)
         new_sm.addAction(action)
+        if a in sm['Code']:
+            code = sm['Code'][a]
+            if Verbose:
+                print "**The Code:", a, code
+            action.code_text[code['type']] = code['text']
 
     for t in sm['Tests']:
         new_sm.addTest(statemachine.Test(t))
@@ -99,12 +101,14 @@ def Build_StateMachine(sm):
     for e in new_sm.events:
         if e.name in sm['Event_Comments']:
             e.comments += sm['Event_Comments'][e.name]
-    new_sm.action_list = sm['Actions']
-    new_sm.action_comments = sm['Action_Comments']
+    for a in new_sm.actions:
+        if a.name in sm['Action_Comments']:
+            a.comments += sm['Action_Comments'][a.name]
     if Verbose:
         print '***The Actions:', sm['Actions']
         print '***The Actions:', sm['Action_Comments']
     if Verbose:
+        print "PRINTIT**"
         new_sm.printit()
     return new_sm
 
@@ -656,6 +660,7 @@ def generate_source(the_fsm, SourceData, source_file):
     from xml.sax.saxutils import escape
     dest_file = os.path.join(os.path.dirname(source_file),\
                              the_fsm.name + ".fsm")
+    the_fsm.dest_file = dest_file
     basename = os.path.basename(dest_file)
     # Generate the Reformatted State Machine text
     fsm_text = statemachine.StateMachine_Text(the_fsm)
@@ -695,6 +700,9 @@ def generate_source(the_fsm, SourceData, source_file):
     uml_cmd = "plantuml %s.uml" % dest_file
     print uml_cmd
     os.system(uml_cmd)
+    # Generate the SQL
+    sql_fsm = statemachine.StateMachine_SQL(the_fsm)
+    sql_fsm.Generate()
     # Generate the HTML
     fsm_html = statemachine.StateMachine_HTML(the_fsm)
     txt_dot = fsm_html.DotStateMachine3()
