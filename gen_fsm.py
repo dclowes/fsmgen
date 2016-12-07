@@ -701,8 +701,8 @@ def generate_source(the_fsm, SourceData, source_file):
     print uml_cmd
     os.system(uml_cmd)
     # Generate the SQL
-    sql_fsm = statemachine.StateMachine_SQL(the_fsm)
-    sql_fsm.Generate()
+    fsm_sql = statemachine.StateMachine_SQL(the_fsm)
+    fsm_sql.Generate()
     # Generate the HTML
     fsm_html = statemachine.StateMachine_HTML(the_fsm)
     txt_dot = fsm_html.DotStateMachine3()
