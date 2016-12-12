@@ -75,7 +75,7 @@ class Action(object):
 
     def __repr__(self):
         if self.code_text:
-            return "%s {%s}" % (self.name, self.code_text)
+            return "%s (%s) {%s}" % (self.name, self.comments, self.code_text)
         else:
             return "%s" % self.name
 
@@ -316,7 +316,7 @@ class StateMachine_Text(StateMachine):
                 txt += ['    %s;' % line]
             txt += ['  }']
         for action in sorted(self.actions, key=lambda action: action.name.lower()):
-            # print "##Action:", action
+            # print "##Action:", repr(action)
             if len(action.code_text) > 0:
                 txt += ['  CODE %s {' % (action.name)]
                 for code_type in sorted(action.code_text):
@@ -1786,12 +1786,20 @@ class StateMachine_SQL(StateMachine_Text):
                           block.event,
                           "\n".join(block.actions),
                           "\n".join(block.targets)))
-        for test in self.tests:
-            print "Test:", test, repr("\n".join(test.tests))
-#           curs.execute("INSERT INTO tests VALUES (:1)",
-#                        "\n".join(test.tests))
-        conn.commit()
+        for action in self.actions:
+            # print "Actions:", action
+            for block in action.code_text:
+                # print "  block:", block
+                curs.execute("INSERT INTO code VALUES (:1, :2, :3)",
+                             (action.name,
+                              block,
+                              '\n'.join(action.code_text[block])))
 
+        for test in self.tests:
+            # print "Test:", type(repr(test)), repr(test)
+            curs.execute("INSERT INTO tests VALUES (:1)", (repr(test),))
+
+        conn.commit()
 
 if __name__ == "__main__":
     print Event("test")

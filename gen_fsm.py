@@ -87,7 +87,8 @@ def Build_StateMachine(sm):
             code = sm['Code'][a]
             if Verbose:
                 print "**The Code:", a, code
-            action.code_text[code['type']] = code['text']
+            for text_block in code['text']:
+                action.code_text[text_block[0]] = text_block[1]
 
     for t in sm['Tests']:
         new_sm.addTest(statemachine.Test(t))
@@ -564,21 +565,21 @@ def p_code_block(p):
 
 def p_c_code_block(p):
     '''
-    tcl_code_block : AT_C code_list AT_END
+    c_code_block : AT_C code_list AT_END
     '''
     ReportP(p, "tcl_code_block")
     p[0] = ['C', p[2]]
 
 def p_python_code_block(p):
     '''
-    c_code_block : AT_PYTHON code_list AT_END
+    python_code_block : AT_PYTHON code_list AT_END
     '''
     ReportP(p, "tcl_code_block")
     p[0] = ['PYTHON', p[2]]
 
 def p_tcl_code_block(p):
     '''
-    python_code_block : AT_TCL code_list AT_END
+    tcl_code_block : AT_TCL code_list AT_END
     '''
     ReportP(p, "tcl_code_block")
     p[0] = ['TCL', p[2]]
@@ -665,6 +666,7 @@ def generate_source(the_fsm, SourceData, source_file):
     # Generate the Reformatted State Machine text
     fsm_text = statemachine.StateMachine_Text(the_fsm)
     txt_text = fsm_text.TextStateMachine()
+    # print txt_text
     with open('%s.txt' % dest_file, 'w') as fdo:
         fdo.write('\n'.join(txt_text))
     # Generate the TCL
