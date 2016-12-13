@@ -48,7 +48,7 @@ class State(object):
             return self.name
 
 class Transition(object):
-    def __init__(self, source, event, actions=None, targets=None):
+    def __init__(self, source, event, actions=[], targets=[]):
         self.source = source
         self.event = event
         self.actions = actions
@@ -58,7 +58,7 @@ class Transition(object):
         return ", ".join([self.source, self.event, repr(self.actions), repr(self.targets)])
 
 class Classifier(object):
-    def __init__(self, source, event, actions=None, targets=None):
+    def __init__(self, source, event, actions=[], targets=[]):
         self.source = source
         self.event = event
         self.actions = actions
@@ -125,19 +125,23 @@ class StateMachine(object):
         assert isinstance(transition, Transition)
         assert transition.source in [s.name for s in self.states]
         assert transition.event in [e.name for e in self.events]
-        if (transition.source, transition.event) not in [(t.source, t.event) for t in self.transitions]:
-            self.transitions.append(transition)
-        else:
+        if (transition.source, transition.event) in [(t.source, t.event) for t in self.transitions]:
             print "Duplicate transition:", transition
+        elif (transition.source, transition.event) in [(t.source, t.event) for t in self.classifiers]:
+            print "Conflicted classification:", transition
+        else:
+            self.transitions.append(transition)
 
     def addClassifier(self, classifier):
         assert isinstance(classifier, Classifier)
         assert classifier.source in [s.name for s in self.states]
         assert classifier.event in [e.name for e in self.events]
-        if (classifier.source, classifier.event) not in [(t.source, t.event) for t in self.classifiers]:
-            self.classifiers.append(classifier)
-        else:
+        if (classifier.source, classifier.event) in [(t.source, t.event) for t in self.classifiers]:
             print "Duplicate classifier:", classifier
+        elif (classifier.source, classifier.event) in [(t.source, t.event) for t in self.transitions]:
+            print "Conflicted transition:", classifier
+        else:
+            self.classifiers.append(classifier)
 
     def addAction(self, action):
         assert isinstance(action, Action)
@@ -191,21 +195,77 @@ class StateMachine(object):
 
 class StateMachine_Text(StateMachine):
     def __init__(self, other):
-        StateMachine.__init__(self, other.name)
-        if not isinstance(other, StateMachine):
+        if isinstance(other, type("")) and other.endswith(".sqlite"):
+            self.loadSQL(other)
             return
-        # Copy from the other one
-        self.name = other.name[:]
-        self.dest_file = other.dest_file
-        self.comments = other.comments[:]
-        self.outputs = other.outputs[:]
-        self.actions = other.actions[:]
-        self.events = other.events[:]
-        self.states = other.states[:]
-        self.tests = other.tests[:]
-        self.transitions = other.transitions[:]
-        self.classifiers = other.classifiers[:]
-        self.action_list = other.action_list[:]
+        if isinstance(other, StateMachine):
+            StateMachine.__init__(self, other.name)
+            # Copy from the other one
+            self.name = other.name[:]
+            self.dest_file = other.dest_file
+            self.comments = other.comments[:]
+            self.outputs = other.outputs[:]
+            self.actions = other.actions[:]
+            self.events = other.events[:]
+            self.states = other.states[:]
+            self.tests = other.tests[:]
+            self.transitions = other.transitions[:]
+            self.classifiers = other.classifiers[:]
+            self.action_list = other.action_list[:]
+            return
+
+    def loadSQL(self, database):
+        import sqlite3
+        conn = sqlite3.connect(database)
+        curs = conn.cursor()
+        curs.execute("SELECT name, comments FROM statemachine")
+        name, comments = curs.fetchone()
+        StateMachine.__init__(self, name)
+        self.name = name
+        if len(comments) > 0:
+            self.comments = comments.split("\n")
+        self.dest_file = database
+        curs.execute("SELECT name, comments FROM actions")
+        for name, comments in curs.fetchall():
+            item = Action(name)
+            if len(comments) > 0:
+                item.comments = comments.split("\n")
+            self.addAction(item)
+
+        curs.execute("SELECT name, comments FROM events")
+        for name, comments in curs.fetchall():
+            item = Event(name)
+            if len(comments) > 0:
+                item.comments = comments.split("\n")
+            self.addEvent(item)
+
+        curs.execute("SELECT name, bases, comments FROM states")
+        for name, bases, comments in curs.fetchall():
+            item = State(name)
+            if len(bases) > 0:
+                item.base_list = bases.split("\n")
+            if len(comments) > 0:
+                item.comments = comments.split("\n")
+            self.addState(item)
+
+        curs.execute("SELECT state, event, actions, targets FROM transitions")
+        for state, event, actions, targets in curs.fetchall():
+            item = Transition(state, event)
+            if len(actions) > 0:
+                item.actions = actions.split("\n")
+            if len(targets) > 0:
+                item.targets = targets.split("\n")
+            self.addTransition(item)
+
+        curs.execute("SELECT state, event, actions, targets FROM classifications")
+        for state, event, actions, targets in curs.fetchall():
+            item = Classifier(state, event)
+            if len(actions) > 0:
+                item.actions = actions.split("\n")
+            if len(targets) > 0:
+                item.targets = targets.split("\n")
+            self.addClassifier(item)
+        return
 
     def Inheritance(self):
         '''
@@ -1748,7 +1808,7 @@ class StateMachine_GCC_2(StateMachine_GCC):
 class StateMachine_SQL(StateMachine_Text):
     def __init__(self, other):
         StateMachine_Text.__init__(self, other)
-        self.Inheritance()
+        #self.Inheritance()
 
     def Generate(self):
         import os
@@ -1763,7 +1823,8 @@ class StateMachine_SQL(StateMachine_Text):
         curs.execute("CREATE TABLE events (name TEXT, comments TEXT)")
         curs.execute("CREATE TABLE actions (name TEXT, comments TEXT)")
         curs.execute("CREATE TABLE code (name TEXT, type TEXT, lines TEXT)")
-        curs.execute("CREATE TABLE blocks (state TEXT, event TEXT, actions TEXT, targets TEXT)")
+        curs.execute("CREATE TABLE transitions (state TEXT, event TEXT, actions TEXT, targets TEXT)")
+        curs.execute("CREATE TABLE classifications (state TEXT, event TEXT, actions TEXT, targets TEXT)")
         curs.execute("CREATE TABLE tests (test TEXT)")
 
         curs.execute("INSERT INTO statemachine VALUES (:1, :2)", (self.name, "\n".join(self.comments)))
@@ -1781,7 +1842,13 @@ class StateMachine_SQL(StateMachine_Text):
                          (a.name,
                           "\n".join(a.comments)))
         for block in sorted(self.transitions, key=lambda block: (block.source, block.event)):
-            curs.execute("INSERT INTO blocks VALUES (:1, :2, :3, :4)",
+            curs.execute("INSERT INTO transitions VALUES (:1, :2, :3, :4)",
+                         (block.source,
+                          block.event,
+                          "\n".join(block.actions),
+                          "\n".join(block.targets)))
+        for block in sorted(self.classifiers, key=lambda block: (block.source, block.event)):
+            curs.execute("INSERT INTO classifications VALUES (:1, :2, :3, :4)",
                          (block.source,
                           block.event,
                           "\n".join(block.actions),
