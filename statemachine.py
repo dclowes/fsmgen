@@ -1003,6 +1003,13 @@ class StateMachine_GCC(StateMachine_Text):
         return hdr
 
     def Absorb_Skel(self, file_name):
+        '''
+        This method reads an existing skeleton file and loads self.code_blocks
+        with the code between custom code markers in the skeleton file.
+
+        This code can later be emitted in place of the boilerplate to preserve
+        custom code development if the state machine is later regenerated.
+        '''
         import re
         target = None
         self.code_blocks = {}

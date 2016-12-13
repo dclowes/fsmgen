@@ -105,8 +105,70 @@ class StateMachine_GCC3(StateMachine_GCC):
     def __init__(self, other):
         StateMachine_GCC.__init__(self, other)
 
-    def Generate_C(self):
-        hdr = []
-        hdr += ['#ifndef %s_H' % self.uname]
-        hdr += ['#define %s_H' % self.uname]
-        
+    def gen_bdy_prefix(self):
+        txt = []
+        txt += ['#include "%s.fsm.h"' % self.name]
+        txt += ['#include <stdlib.h>']
+        txt += ['#include <stdio.h>']
+        txt += ['#include <string.h>']
+        txt += ['']
+        txt += ['#define %s_NUM_STATES %d' % (self.uname, len(self.states))]
+        txt += ['#define %s_NUM_EVENTS %d' % (self.uname, len(self.events))]
+        txt += ['#define %s_NUM_ACTIONS %d' % (self.uname, len(self.actions))]
+        txt += ['']
+        return txt
+
+    def gen_bdy_actions(self):
+        txt = []
+        txt += ['/* Actions */']
+        txt += ['struct %s_t {' % self.mkAction()]
+        txt += ['    int index;']
+        txt += ['    char *name;']
+        txt += ['};']
+
+        index = 0
+        for action in sorted(s.name for s in self.actions):
+            index += 1
+            txt += ['const struct %s_t %s = {%d, "%s";};' %
+                    (self.mkAction(),
+                     self.mkAction(action),
+                     index,
+                     action)]
+        return txt
+
+    def gen_bdy_events(self):
+        txt = []
+        txt += ['/* Events */']
+        txt += ['struct %s_t {' % self.mkEvent()]
+        txt += ['    int index;']
+        txt += ['    char *name;']
+        txt += ['};']
+
+        index = 0
+        for event in sorted(e.name for e in self.events):
+            index += 1
+            txt += ['const struct %s_t %s = {%d, "%s";};' %
+                    (self.mkEvent(),
+                     self.mkEvent(event),
+                     index,
+                     event)]
+        return txt
+
+    def gen_bdy_states(self):
+        txt = []
+        txt += ['/* States */']
+        txt += ['struct %s_t {' % self.mkState()]
+        txt += ['    int index;']
+        txt += ['    char *name;']
+        txt += ['};']
+
+        index = 0
+        for state in sorted(s.name for s in self.states):
+            index += 1
+            txt += ['const struct %s_t %s = {%d, "%s";};' %
+                    (self.mkState(),
+                     self.mkState(state),
+                     index,
+                     state)]
+        return txt
+
