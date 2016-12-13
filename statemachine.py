@@ -1002,12 +1002,37 @@ class StateMachine_GCC(StateMachine_Text):
         hdr += ['', '#endif /* %s_H */' % self.uname]
         return hdr
 
+    def Absorb_Skel(self, file_name):
+        import re
+        target = None
+        self.code_blocks = {}
+        try:
+            with open(file_name, "r") as fd:
+                lines = fd.read().splitlines()
+        except IOError as err:
+            lines = []
+        for line in lines:
+            if "BEGIN CUSTOM:" in line:
+                target = re.sub(r'.*BEGIN CUSTOM: (.*) {.*', r'\1', line)
+                self.code_blocks[target] = []
+                continue
+            if "END CUSTOM:" in line:
+                target = None
+                continue
+            if target:
+                self.code_blocks[target].append(line)
+#       for target in self.code_blocks:
+#           print "Target:", target, len(self.code_blocks[target])
+
     def Generate_Skel(self):
         hdr = []
         txt = []
         txt += ['#include "%s.fsm.h"' % self.name]
         txt += ['#include <stdlib.h>']
         txt += ['/* BEGIN CUSTOM: include files {{{*/']
+        if 'include files' in self.code_blocks:
+            txt += self.code_blocks['include files']
+            del self.code_blocks['include files']
         txt += ['/* END CUSTOM: include files }}}*/']
         txt += ['']
         the_blocks = [b for b in self.classifiers + self.transitions]
@@ -1025,7 +1050,11 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['typedef %s_PRIVATE_DATA *pPRIVATE_DATA;' % self.mkName()]
         txt += ['']
         txt += ['/* BEGIN CUSTOM: forward declarations {{{*/']
-        txt += ['/* Place forward declarations, used in the action code, here */']
+        if 'forward declarations' in self.code_blocks:
+            txt += self.code_blocks['forward declarations']
+            del self.code_blocks['forward declarations']
+        else:
+            txt += ['/* Place forward declarations, used in the action code, here */']
         txt += ['/* END CUSTOM: forward declarations }}}*/']
         txt += ['']
         for action in the_actions:
@@ -1033,7 +1062,7 @@ class StateMachine_GCC(StateMachine_Text):
             if result:
                 txt += ['/* Classifier returns: */']
                 for target in targets:
-                    txt += ['/*    %s */' % self.mkEvent(target[0])]
+                    txt += ['/*    %s */' % self.mkEvent(target)]
             else:
                 txt += ['/* Transition: returns NULL */']
             a = self.getAction(action)
@@ -1045,7 +1074,11 @@ class StateMachine_GCC(StateMachine_Text):
             txt += ['{']
             txt += ['    pPRIVATE_DATA self = (pPRIVATE_DATA) pPrivate;']
             txt += ['    /* BEGIN CUSTOM: %s action code {{{*/' % action]
-            txt += ['    return NULL;']
+            if '%s action code' % action in self.code_blocks:
+                txt += self.code_blocks['%s action code' % action]
+                del self.code_blocks['%s action code' % action]
+            else:
+                txt += ['    return NULL;']
             txt += ['    /* END CUSTOM: %s action code }}}*/' % action]
             txt += ['}']
             txt += ['']
@@ -1075,35 +1108,47 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['}']
         txt += ['']
         txt += ['/* BEGIN CUSTOM: control code {{{*/']
-        txt += ['/* Place function definitions, used in the action code, here */']
-        txt += ['']
-        txt += ['#ifdef UNIT_TEST']
-        txt += ['/* Place unit test code here */']
-        txt += ['']
-        txt += ['/* Place unit test code main code here */']
-        txt += ['int main(int argc, char *argv[])']
-        txt += ['{']
-        txt += ['    %s smi;' % self.mkName()]
-        txt += ['    %s_PRIVATE_DATA private_data;' % self.mkName()]
-        txt += ['']
-        txt += ['    %s();' % self.mkFunc('ClassInit')]
-        txt += ['    memset(&private_data, 0, sizeof(private_data));']
-        txt += ['    smi = make(']
-        txt += ['        "test", %s,' % self.mkState('')]
-        txt += ['        &private_data, NULL);']
-        txt += ['    %s(smi,' % self.mkFunc('SetReportFunc')]
-        txt += ['        NULL);']
-        txt += ['    /* TODO: test something */']
-        txt += ['    %s(smi);' % self.mkFunc('InstanceKill')]
-        txt += ['    return EXIT_SUCCESS;']
-        txt += ['}']
-        txt += ['']
-        txt += ['#endif /* UNIT_TEST */']
-        txt += ['']
-        txt += ['/*']
-        txt += [' * vim: ft=c ts=8 sts=4 sw=4 et cindent']
-        txt += [' */']
+        if 'control code' in self.code_blocks:
+            txt += self.code_blocks['control code']
+            del self.code_blocks['control code']
+        else:
+            txt += ['/* Place function definitions, used in the action code, here */']
+            txt += ['']
+            txt += ['#ifdef UNIT_TEST']
+            txt += ['/* Place unit test code here */']
+            txt += ['']
+            txt += ['/* Place unit test code main code here */']
+            txt += ['int main(int argc, char *argv[])']
+            txt += ['{']
+            txt += ['    %s smi;' % self.mkName()]
+            txt += ['    %s_PRIVATE_DATA private_data;' % self.mkName()]
+            txt += ['']
+            txt += ['    %s();' % self.mkFunc('ClassInit')]
+            txt += ['    memset(&private_data, 0, sizeof(private_data));']
+            txt += ['    smi = make(']
+            txt += ['        "test", %s,' % self.mkState('')]
+            txt += ['        &private_data, NULL);']
+            txt += ['    %s(smi,' % self.mkFunc('SetReportFunc')]
+            txt += ['        NULL);']
+            txt += ['    /* TODO: test something */']
+            txt += ['    %s(smi);' % self.mkFunc('InstanceKill')]
+            txt += ['    return EXIT_SUCCESS;']
+            txt += ['}']
+            txt += ['']
+            txt += ['#endif /* UNIT_TEST */']
+            txt += ['']
+            txt += ['/*']
+            txt += [' * vim: ft=c ts=8 sts=4 sw=4 et cindent']
+            txt += [' */']
         txt += ['/* END CUSTOM: control code }}}*/']
+        if len(self.code_blocks) > 0:
+            txt += ['#if 0 /* BEGIN PARKING LOT {{{*/']
+            for block in self.code_blocks.keys():
+                txt += ['/* BEGIN CUSTOM: %s {{{*/' % block]
+                txt += self.code_blocks[block]
+                txt += ['/* END CUSTOM: %s }}}*/' % block]
+                del self.code_blocks[block]
+            txt += ['#endif /* END PARKING LOT }}}*/']
         return (hdr, txt)
 
     def Generate_Code(self):
@@ -1506,7 +1551,7 @@ class StateMachine_GCC(StateMachine_Text):
                         else:
                             evt_cnt = len(block.targets)
                             for item in block.targets:
-                                evt_txt += ['    &event_pointers[e%s],' % self.mkEvent(item[0])]
+                                evt_txt += ['    &event_pointers[e%s],' % self.mkEvent(item)]
                             line += '        .ac_type=fsmActionClass,\n'
                             line += '        .u.c.ac_class=e%s,\n' % self.mkAction(block.actions[0])
                             line += '        .u.c.ev_start=%d,\n' % evt_idx
@@ -1666,7 +1711,7 @@ class StateMachine_GCC(StateMachine_Text):
             txt += ['        void *pPrivate)']
             txt += ['{']
             if action in classifier_list:
-                next_event = classifier_list[action][0]
+                next_event = classifier_list[action]
                 txt += ['    printf("State: %%-20s, Event: %%-20s, Classifier: %-20s, NextEvent: %s\\n", state->name, event->name);' % (action, next_event)]
                 txt += ['    return %s;' % self.mkEvent(next_event)]
             else:
