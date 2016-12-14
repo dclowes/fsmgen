@@ -765,12 +765,12 @@ class StateMachine_GCC(StateMachine_Text):
             txt += ['#define %s %d'\
                     % (self.mkName(item[0]), item[1])]
 
-        # States
-        txt += self.Generate_States(stts)
-        # Events
-        txt += self.Generate_Events(evts)
         # Actions
         txt += self.Generate_Actions(acts)
+        # Events
+        txt += self.Generate_Events(evts)
+        # States
+        txt += self.Generate_States(stts)
         # Transition Table Structures
         txt += self.Generate_Trans(the_states, the_events, the_blocks, classifier_list)
         txt += ['']
@@ -1020,8 +1020,8 @@ class StateMachine_GCC3(StateMachine_GCC):
         txt = []
         txt += ['/* Actions */']
         txt += ['struct %s_t {' % self.mkAction()]
-        txt += ['    int index;']
         txt += ['    char *name;']
+        txt += ['    int index;']
         txt += ['};']
 
         index = 0
@@ -1038,8 +1038,8 @@ class StateMachine_GCC3(StateMachine_GCC):
         txt = []
         txt += ['/* Events */']
         txt += ['struct %s_t {' % self.mkEvent()]
-        txt += ['    int index;']
         txt += ['    char *name;']
+        txt += ['    int index;']
         txt += ['};']
 
         index = 0
@@ -1056,8 +1056,8 @@ class StateMachine_GCC3(StateMachine_GCC):
         txt = []
         txt += ['/* States */']
         txt += ['struct %s_t {' % self.mkState()]
-        txt += ['    int index;']
         txt += ['    char *name;']
+        txt += ['    int index;']
         txt += ['};']
 
         index = 0
