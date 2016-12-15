@@ -1632,7 +1632,6 @@ class StateMachine_GCC3(StateMachine_GCC):
         txt += ['                                ev->name);']
         txt += ['                    break;']
         txt += ['            }']
-        txt += ['            break;']
         txt += ['        }']
         txt += ['        if (nTrans == 0) /* event not handled */']
         txt += ['            if (smi->reportFunc)']
