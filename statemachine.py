@@ -179,6 +179,15 @@ class StateMachine(object):
                 return item.targets
         return []
 
+    def getTrans(self, state, event):
+        for item in self.classifiers:
+            if item.source == state.name and item.event == event.name:
+                return item
+        for item in self.transitions:
+            if item.source == state.name and item.event == event.name:
+                return item
+        return None
+
     def isClassifier(self, name):
         for item in self.classifiers:
             if name in item.actions:
@@ -211,15 +220,6 @@ class StateMachine(object):
 
     def States(self):
         return sorted(self.states, key=lambda s: s.name)
-
-    def Trans(self, state, event):
-        for item in self.classifiers:
-            if item.source == state.name and item.event == event.name:
-                return item
-        for item in self.transitions:
-            if item.source == state.name and item.event == event.name:
-                return item
-        return None
 
 class StateMachine_Text(StateMachine):
     def __init__(self, other):

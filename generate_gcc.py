@@ -15,6 +15,7 @@
 
 from statemachine import StateMachine_Text
 from statemachine import Classifier, Transition
+import statemachine
 
 class StateMachine_GCC(StateMachine_Text):
     def __init__(self, other):
@@ -44,9 +45,14 @@ class StateMachine_GCC(StateMachine_Text):
             return  self.prefix + '%s_EVENT_%s' % (self.uname, name)
         return  self.prefix + '%s_EVENT' % (self.uname)
 
-    def mkAction(self, name=None):
-        if name:
-            return  self.prefix + '%s_ACTION_%s' % (self.uname, name)
+    def mkAction(self, that=None):
+        txt = ''
+        if that:
+            if isinstance(that, statemachine.Action):
+                txt = that.name
+            else:
+                txt = that
+            return  self.prefix + '%s_ACTION_%s' % (self.uname, txt)
         return  self.prefix + '%s_ACTION' % (self.uname)
 
     def mkActionFunc(self, action):
@@ -1003,144 +1009,12 @@ class StateMachine_GCC3(StateMachine_GCC):
     def __init__(self, other):
         StateMachine_GCC.__init__(self, other)
 
-    def gen_bdy_prefix(self):
-        txt = []
-        txt += ['#include "%s.fsm.h"' % self.name]
-        txt += ['#include <stdlib.h>']
-        txt += ['#include <stdio.h>']
-        txt += ['#include <string.h>']
-        txt += ['']
-        txt += ['#define %s_NUM_STATES %d' % (self.uname, len(self.states))]
-        txt += ['#define %s_NUM_EVENTS %d' % (self.uname, len(self.events))]
-        txt += ['#define %s_NUM_ACTIONS %d' % (self.uname, len(self.actions))]
-        txt += ['']
-        return txt
-
-    def gen_bdy_actions(self):
-        txt = []
-        txt += ['/* Actions */']
-        txt += ['struct %s_t {' % self.mkAction()]
-        txt += ['    char *name;']
-        txt += ['    int index;']
-        txt += ['};']
-
-        index = 0
-        for action in sorted(s.name for s in self.actions):
-            index += 1
-            txt += ['const struct %s_t %s = {%d, "%s";};' %
-                    (self.mkAction(),
-                     self.mkAction(action),
-                     index,
-                     action)]
-        return txt
-
-    def gen_bdy_events(self):
-        txt = []
-        txt += ['/* Events */']
-        txt += ['struct %s_t {' % self.mkEvent()]
-        txt += ['    char *name;']
-        txt += ['    int index;']
-        txt += ['};']
-
-        index = 0
-        for event in sorted(e.name for e in self.events):
-            index += 1
-            txt += ['const struct %s_t %s = {%d, "%s";};' %
-                    (self.mkEvent(),
-                     self.mkEvent(event),
-                     index,
-                     event)]
-        return txt
-
-    def gen_bdy_states(self):
-        txt = []
-        txt += ['/* States */']
-        txt += ['struct %s_t {' % self.mkState()]
-        txt += ['    char *name;']
-        txt += ['    int index;']
-        txt += ['};']
-
-        index = 0
-        for state in sorted(s.name for s in self.states):
-            index += 1
-            txt += ['const struct %s_t %s = {%d, "%s";};' %
-                    (self.mkState(),
-                     self.mkState(state),
-                     index,
-                     state)]
-        return txt
-
-    def gen_def_trans(self):
-        txt = []
-        txt += ['/* Transition Table Structures */']
-        txt += ['typedef enum {']
-        txt += ['    fsmActionClass = 1, /* Classifier Action Entry */']
-        txt += ['    fsmActionTrans = 2  /* Transition Action Entry */']
-        txt += ['} fsmActionType;']
-        txt += ['typedef struct fsmTransTab_t {']
-        txt += ['    %s si; /* Input State */' % self.mkState()]
-        txt += ['    %s ei; /* Input Event */' % self.mkEvent()]
-        txt += ['    fsmActionType ac_type; /* Classifier or Transition */']
-        txt += ['    union {']
-        txt += ['        struct { /* Classifier Action Entry */']
-        txt += ['            int ac_class; /* Action Classifier */']
-        txt += ['            int ev_start; /* First output Event */']
-        txt += ['            int ev_count; /* Number of candidates */']
-        txt += ['        } c;']
-        txt += ['        struct { /* Transition Action Entry */']
-        txt += ['            %s so;        /* Output State */' % self.mkState()]
-        txt += ['            int ac_start; /* First Action */']
-        txt += ['            int ac_count; /* Number of Actions */']
-        txt += ['        } t;']
-        txt += ['    } u;']
-        txt += ['} fsmTransTab;']
-        return txt
-
-    def gen_bdy_trans(self):
-        txt = []
-        txt = ['/* Transition Table Entries */']
-        for state in self.States():
-            for event in self.Events():
-                trans = self.Trans(state, event)
-                if trans:
-                    if isinstance(trans, Classifier):
-                        # TODO Classifier body
-                        txt += ['static fsmTransTab %s = {' % self.mkTrans(state.name, event.name)]
-                        txt += ['    .si=%s,' % self.mkState(state.name)]
-                        txt += ['    .ei=%s,' % self.mkEvent(event.name)]
-                        txt += ['    .ac_type=fsmActionClass,\n']
-                        txt += ['    .u.c.ac_class=%s,\n' % self.mkAction(trans.actions[0])]
-                        txt += ['']
-                        txt += ['']
-                        txt += ['};']
-                    if isinstance(trans, Transition):
-                        pass # TODO body
-        txt += ['']
-        for state in self.States():
-            for event in self.Events():
-                trans = self.Trans(state, event)
-                if trans:
-                    if isinstance(trans, Classifier):
-                        pass # TODO line
-                    elif isinstance(trans, Transition):
-                        pass # TODO line
-                    else:
-                        txt += ['    NULL,']
-        return txt
-
-    def gen_bdy(self):
-        txt = []
-        txt += self.gen_bdy_prefix()
-        txt += self.gen_bdy_actions()
-        txt += self.gen_bdy_events()
-        txt += self.gen_def_trans()
-        txt += self.gen_bdy_trans()
-        return txt
-
     def gen_hdr_actions(self):
         hdr = []
         hdr += ['/* Actions */']
-        hdr += ['typedef struct %s_t *%s;' % (self.mkAction(), self.mkAction())]
+        hdr += ['typedef const struct %s_t *%s;' %
+                (self.mkAction(),
+                 self.mkAction())]
         for action in self.Actions():
             hdr += ['extern const %s %s;' % (self.mkAction(), self.mkAction(action.name))]
         return hdr
@@ -1148,7 +1022,9 @@ class StateMachine_GCC3(StateMachine_GCC):
     def gen_hdr_events(self):
         hdr = []
         hdr += ['/* Events */']
-        hdr += ['typedef struct %s_t *%s;' % (self.mkEvent(), self.mkEvent())]
+        hdr += ['typedef const struct %s_t *%s;' %
+                (self.mkEvent(),
+                 self.mkEvent())]
         for event in self.Events():
             hdr += ['extern const %s %s;' % (self.mkEvent(), self.mkEvent(event.name))]
         return hdr
@@ -1156,7 +1032,9 @@ class StateMachine_GCC3(StateMachine_GCC):
     def gen_hdr_states(self):
         hdr = []
         hdr += ['/* States */']
-        hdr += ['typedef struct %s_t *%s;' % (self.mkState(), self.mkState())]
+        hdr += ['typedef const struct %s_t *%s;' %
+                (self.mkState(),
+                 self.mkState())]
         for state in self.States():
             hdr += ['extern const %s %s;' % (self.mkState(), self.mkState(state.name))]
         return hdr
@@ -1230,9 +1108,197 @@ class StateMachine_GCC3(StateMachine_GCC):
         hdr += ['#endif /* %s_H */' % self.uname]
         return hdr
 
+    def gen_bdy_prefix(self):
+        txt = []
+        txt += ['#include <stdlib.h>']
+        txt += ['#include <stdio.h>']
+        txt += ['#include <string.h>']
+        txt += ['']
+        txt += ['#define %s_NUM_STATES %d' % (self.uname, len(self.states))]
+        txt += ['#define %s_NUM_EVENTS %d' % (self.uname, len(self.events))]
+        txt += ['#define %s_NUM_ACTIONS %d' % (self.uname, len(self.actions))]
+        txt += ['']
+        return txt
+
+    def gen_bdy_actions(self):
+        txt = []
+        txt += ['/* Actions */']
+        txt += ['struct %s_t {' % self.mkAction()]
+        txt += ['    int index;']
+        txt += ['    char *name;']
+        txt += ['};']
+
+        txt += ['enum {']
+        for index, action in enumerate(self.Actions()):
+            txt += ['    e%s = %d,' % (self.mkAction(action.name), index + 1)]
+        txt += ['};']
+
+        for action in self.Actions():
+            txt += ['static const struct %s_t s%s = {e%s, "%s"};' %
+                    (self.mkAction(),
+                     self.mkAction(action.name),
+                     self.mkAction(action.name),
+                     self.mkAction(action.name))]
+        for action in self.Actions():
+            txt += ['const %s %s = &s%s;' %
+                    (self.mkAction(),
+                     self.mkAction(action.name),
+                     self.mkAction(action.name))]
+        txt += ['static const struct %s_t *%s_table[] = {' % (self.mkAction(), self.mkAction())]
+        txt += ['    NULL,']
+        for action in self.Actions():
+            txt += ['    &s%s,' % (self.mkAction(action.name))]
+        txt += ['};']
+        return txt
+
+    def gen_bdy_events(self):
+        txt = []
+        txt += ['/* Events */']
+        txt += ['struct %s_t {' % self.mkEvent()]
+        txt += ['    int index;']
+        txt += ['    char *name;']
+        txt += ['};']
+
+        txt += ['enum {']
+        for index, event in enumerate(self.Events()):
+            txt += ['    e%s = %d,' % (self.mkEvent(event.name), index + 1)]
+        txt += ['};']
+
+        for event in self.Events():
+            txt += ['static const struct %s_t s%s = {e%s, "%s"};' %
+                    (self.mkEvent(),
+                     self.mkEvent(event.name),
+                     self.mkEvent(event.name),
+                     self.mkEvent(event.name))]
+        for event in self.Events():
+            txt += ['const %s %s = &s%s;' %
+                    (self.mkEvent(),
+                     self.mkEvent(event.name),
+                     self.mkEvent(event.name))]
+        txt += ['static const struct %s_t * const %s_table[] = {' % (self.mkEvent(), self.mkEvent())]
+        txt += ['    NULL,']
+        for event in self.Events():
+            txt += ['    &s%s,' % (self.mkEvent(event.name))]
+        txt += ['};']
+        return txt
+
+    def gen_bdy_states(self):
+        txt = []
+
+        txt += ['/* States */']
+        txt += ['enum {']
+        for index, state in enumerate(self.States()):
+            txt += ['    e%s = %d,' % (self.mkState(state.name), index + 1)]
+        txt += ['};']
+
+        txt += self.gen_def_trans()
+        txt += self.gen_bdy_trans()
+
+        txt += ['/* State Data */']
+        txt += ['struct %s_t {' % self.mkState()]
+        txt += ['    int index;']
+        txt += ['    const char *name;']
+        txt += ['    const fsmTransTab *transTab[];']
+        txt += ['};']
+        for state in self.States():
+            txt += ['static struct %s_t const s%s = {' % (self.mkState(), self.mkState(state))]
+            txt += ['    .index=e%s,' % (self.mkState(state.name))]
+            txt += ['    .name="%s",' % (self.mkState(state))]
+            txt += ['    .transTab={']
+            txt += ['                   NULL,']
+            for event in self.Events():
+                if self.getTrans(state, event):
+                    txt += ['        &%s,' % (self.mkTrans(state, event))]
+                else:
+                    txt += ['        NULL, /* %s */' % (self.mkTrans(state, event))]
+            txt += ['   }']
+            txt += ['};']
+        txt += ['']
+        for state in self.States():
+            txt += ['const %s %s = &s%s;' %
+                    (self.mkState(),
+                     self.mkState(state.name),
+                     self.mkState(state.name))]
+        txt += ['static struct %s_t const * const %s_table[] = {' % (self.mkState(), self.mkState())]
+        txt += ['    NULL,']
+        for state in self.States():
+            txt += ['    &s%s,' % (self.mkState(state))]
+        txt += ['    NULL']
+        txt += ['};']
+        return txt
+
+    def gen_def_trans(self):
+        txt = []
+        txt += ['/* Transition Table Structures */']
+        txt += ['typedef enum {']
+        txt += ['    fsmActionClass = 1, /* Classifier Action Entry */']
+        txt += ['    fsmActionTrans = 2  /* Transition Action Entry */']
+        txt += ['} fsmActionType;']
+        txt += ['typedef struct fsmTransTab_t {']
+        txt += ['    int inState;  /* Input State */']
+        txt += ['    int inEvent;  /* Input Event */']
+        txt += ['    fsmActionType ac_type; /* Classifier or Transition */']
+        txt += ['    int ac_code;  /* Classifier Func or Output State */']
+        txt += ['    int ac_list[];    /* Output Events or Action Funcs */']
+        txt += ['} fsmTransTab;']
+        return txt
+
+    def gen_bdy_trans(self):
+        txt = []
+        txt = ['/* Transition Table Entries */']
+        for state in self.States():
+            for event in self.Events():
+                trans = self.getTrans(state, event)
+                if trans:
+                    txt += ['const static fsmTransTab %s = {' % self.mkTrans(state.name, event.name)]
+                    txt += ['    .inState=e%s,' % self.mkState(state.name)]
+                    txt += ['    .inEvent=e%s,' % self.mkEvent(event.name)]
+                    if isinstance(trans, Classifier):
+                        # TODO Classifier body
+                        txt += ['    .ac_type=fsmActionClass,']
+                        txt += ['    .ac_code=e%s,' % self.mkAction(trans.actions[0])]
+                        txt += ['    .ac_list= {']
+                        for tab in trans.targets:
+                            txt += ['        e%s,' % self.mkEvent(tab)]
+                        txt += ['        0}']
+                    elif isinstance(trans, Transition):
+                        # TODO body
+                        txt += ['    .ac_type=fsmActionTrans,']
+                        if len(trans.targets) > 0:
+                            txt += ['    .ac_code=e%s,' % self.mkState(trans.targets[0])]
+                        else:
+                            txt += ['    .ac_code=0,']
+                        txt += ['    .ac_list= {']
+                        for tab in trans.actions:
+                            txt += ['        e%s,' % self.mkAction(tab)]
+                        txt += ['        0}']
+                    txt += ['};']
+        txt += ['']
+        for state in self.States():
+            for event in self.Events():
+                trans = self.getTrans(state, event)
+                if trans:
+                    if isinstance(trans, Classifier):
+                        pass # TODO line
+                    elif isinstance(trans, Transition):
+                        pass # TODO line
+                    else:
+                        txt += ['    NULL,']
+        return txt
+
+    def gen_bdy(self):
+        txt = []
+        txt += self.gen_bdy_prefix()
+        txt += self.gen_bdy_actions()
+        txt += self.gen_bdy_events()
+        txt += self.gen_bdy_states()
+        txt += self.gen_bdy_fsm()
+        txt += self.gen_bdy_Code()
+        txt += self.gen_bdy_unit_test()
+        return txt
+
     def gen_bdy_skel(self):
         txt = []
-        txt += ['#include "%s.fsm.h"' % self.name]
         txt += ['#include <stdlib.h>']
         txt += ['/* BEGIN CUSTOM: include files {{{*/']
         if 'include files' in self.code_blocks:
@@ -1345,3 +1411,366 @@ class StateMachine_GCC3(StateMachine_GCC):
 
     def gen_skl(self):
         return self.gen_bdy_skel()
+
+    def gen_bdy_fsm(self):
+        txt = []
+        txt += ['static %s action_funcs[%s+1];' % (self.mkFunc('Action'), self.mkName('NUM_ACTIONS'))]
+        txt += ['', '/* State Machine Class */']
+        txt += ['typedef struct fsmStateMachine_t fsmStateMachine;']
+        txt += ['struct fsmStateMachine_t {']
+        txt += ['    char *name;']
+        txt += ['    int numStates;']
+        txt += ['    int numEvents;']
+        txt += ['    int numActions;']
+        txt += ['    const %s *stateTable;' % (self.mkState())]
+        txt += ['    const %s *eventTable;' % (self.mkEvent())]
+        txt += ['    const %s *actionTable;' % (self.mkAction())]
+        txt += ['    %s entryEvent;' % self.mkEvent()]
+        txt += ['    %s exitEvent;' % self.mkEvent()]
+        txt += ['    %s *actionTab; /* Class Actions */' % self.mkFunc('Action')]
+        txt += ['};']
+        txt += ['', '/* Event Queue Entry */']
+        txt += ['typedef struct EventQueueEntry_t {']
+        txt += ['    struct EventQueueEntry_t *next;']
+        txt += ['    %s_EVENT ev;' % self.mkName()]
+        txt += ['    void *pContext;']
+        txt += ['} *pQueueEntry;']
+        txt += ['', '/* State Machine Instance */']
+        txt += ['struct %s_t {' % self.mkName()]
+        txt += ['    char *name;']
+        txt += ['    const fsmStateMachine *fsm;']
+        txt += ['    %s *actionTab; /* Instance Actions */' % self.mkFunc('Action')]
+        txt += ['    %s currentState;' % self.mkState()]
+        txt += ['    void (*reportFunc)(%s smi, const char *fmt, ...);' % self.mkName()]
+        txt += ['    void *pPrivate; /* private */']
+        txt += ['    void (*pKiller)(void*);']
+        txt += ['    struct {']
+        txt += ['        pQueueEntry pHead;']
+        txt += ['        pQueueEntry pTail;']
+        txt += ['        int iLength;']
+        txt += ['    } EventQueue, EmptyQueue;']
+        txt += ['};']
+        txt += ['', '/* State Machine Initializer */']
+        txt += ['static const fsmStateMachine fsm_%s = {' % self.name]
+        txt += ['    .name="%s",' % self.name]
+        txt += ['    .numStates=%s,' % self.mkName('NUM_STATES')]
+        txt += ['    .numEvents=%s,' % self.mkName('NUM_EVENTS')]
+        txt += ['    .numActions=%s,' % self.mkName('NUM_ACTIONS')]
+        txt += ['    .stateTable=%s_table,' % (self.mkState())]
+        txt += ['    .eventTable=%s_table,' % (self.mkEvent())]
+        txt += ['    .actionTable=%s_table,' % (self.mkAction())]
+        txt += ['    .entryEvent=&s%s,' % self.mkEvent('Entry')]
+        txt += ['    .exitEvent=&s%s,' % self.mkEvent('Exit')]
+        txt += ['    .actionTab=action_funcs']
+        txt += ['};', '']
+        return txt
+
+    def gen_bdy_unit_test(self):
+        txt = ['', '#ifdef UNIT_TEST']
+        for action in self.Actions():
+            txt += ['static %s %s_test(' % (self.mkEvent(), self.mkAction(action))]
+            txt += ['        %s smi,' % self.mkName()]
+            txt += ['        %s state,' % self.mkState()]
+            txt += ['        %s event,' % self.mkEvent()]
+            txt += ['        void *pContext,']
+            txt += ['        void *pPrivate)']
+            txt += ['{']
+            if self.isClassifier(action.name):
+                next_event = self.getTargets(action.name)[0]
+                txt += ['    printf("State: %%-20s, Event: %%-20s, Classifier: %-20s, NextEvent: %s\\n", state->name, event->name);' % (action, next_event)]
+                txt += ['    return %s;' % self.mkEvent(next_event)]
+            else:
+                txt += ['    printf("State: %%-20s, Event: %%-20s, ActionFunc: %-20s\\n", state->name, event->name);' % action]
+                txt += ['    return NULL;']
+            txt += ['}', '']
+        txt += ['static void register_%s_actions(void) {' % (self.name)]
+        for action in self.Actions():
+            txt += ['    %s(%s, %s_test);'\
+                    % (self.mkFunc('ClassSetAction'), self.mkAction(action), self.mkAction(action))]
+        txt += ['};', '']
+        txt += ['static void test_%s_actions(void) {' % (self.name)]
+        txt += ['    %s smi;' % (self.mkName())]
+        txt += ['    int state;']
+        txt += ['    int event;']
+        txt += ['    int idx;']
+        txt += ['    register_%s_actions();' % (self.name), '']
+        txt += ['    smi = %s("test", %s);' % (self.mkFunc('InstanceMake'), self.mkState(self.states[0]))]
+        txt += ['    for (state = 1; state <= %s; ++state)' % self.mkName('NUM_STATES')]
+        txt += ['        for (event = 1; event <= %s; ++event) {' % self.mkName('NUM_EVENTS')]
+        txt += ['                const fsmTransTab *tab = %s_table[state]->transTab[event];' % (self.mkState())]
+        txt += ['                if (tab) {']
+        txt += ['                    smi->currentState = %s_table[state];' % (self.mkState())]
+        txt += ['                    %s(smi, %s_table[event], NULL);' % (self.mkFunc('InstanceRun'), self.mkEvent())]
+        txt += ['                    if (smi->currentState->index != state)']
+        txt += ['                        printf("       %%s ===> %%s\\n", %s_table[state]->name, smi->currentState->name);' % (self.mkState())]
+        txt += ['                }']
+        txt += ['            }']
+        for test in self.tests:
+            # print "Test::", test
+            txt += ['    do {']
+            txt += ['        smi->currentState = %s;' % self.mkState(test.tests[0])]
+            for t in test.tests:
+                if self.getState(t):
+                    txt += ['        if (smi->currentState != %s) {' % self.mkState(t)]
+                    txt += ['            printf("State is %%s but expected %s\\n", smi->currentState->name);' % t]
+                    txt += ['            break;']
+                    txt += ['        }']
+                else:
+                    txt += ['        %s(smi, %s, NULL);' % (self.mkFunc('InstanceRun'), self.mkEvent(t))]
+            txt += ['        printf("Test Passed: %s\\n");' % repr(test)]
+            txt += ['    } while (0);']
+        txt += ['    %s(smi);' % (self.mkFunc('InstanceKill'))]
+        txt += ['};', '']
+        txt += ['static void fsmPrintStateMachine(void)']
+        txt += ['{']
+        txt += ['']
+        txt += ['}']
+        txt += ['']
+        txt += ['int main(int argc, char *argv[]) {']
+        txt += ['    fsmPrintStateMachine();']
+        txt += ['    test_%s_actions();' % (self.name)]
+        txt += ['};', '']
+        txt += ['#endif /* UNIT_TEST */']
+        return txt
+
+    def gen_bdy_Code(self):
+        txt = []
+        txt += ['/* Create an Instance of this Statemachine */']
+        txt += ['%s %s(const char *name, %s initial)'\
+                % (self.mkName(), self.mkFunc('InstanceMake'), self.mkState())]
+        txt += ['{']
+        txt += ['    %s smi = (%s) calloc(1, sizeof(struct %s_t));'\
+                % (self.mkName(), self.mkName(), self.mkName())]
+        txt += ['    if (smi == NULL)']
+        txt += ['        return NULL;']
+        txt += ['    /* TODO initialisation */']
+        txt += ['    smi->name = strdup(name);']
+        txt += ['    smi->fsm = &fsm_%s;' % self.name]
+        txt += ['    smi->currentState = initial;']
+        txt += ['    return smi;']
+        txt += ['}']
+        txt += ['']
+        txt += ['/* Destroy an Instance of this Statemachine */']
+        txt += ['void %s(%s smi)' % (self.mkFunc('InstanceKill'), self.mkName())]
+        txt += ['{']
+        txt += ['    if (smi == NULL)']
+        txt += ['        return;']
+        txt += ['    free(smi->name);']
+        txt += ['    if (smi->actionTab)']
+        txt += ['        free(smi->actionTab);']
+        txt += ['    if (smi->pPrivate && smi->pKiller)']
+        txt += ['        (*smi->pKiller)(smi->pPrivate);']
+        txt += ['    while (smi->EmptyQueue.pHead) {']
+        txt += ['        pQueueEntry entry;']
+        txt += ['        entry = smi->EmptyQueue.pHead;']
+        txt += ['        smi->EmptyQueue.pHead = smi->EmptyQueue.pHead->next;']
+        txt += ['        free(entry);']
+        txt += ['    }']
+        txt += ['    free(smi);']
+        txt += ['}']
+        txt += ['']
+        txt += ['/* Run one Event for this Instance of this Statemachine */']
+        txt += ['static %s %s('% (self.mkState(), self.mkFunc('RunStateEvent'))]
+        txt += ['    %s smi,' % (self.mkName())]
+        txt += ['    %s ev,' % (self.mkEvent())]
+        txt += ['    void *pContext)']
+        txt += ['{']
+        txt += ['    int i, j, k;']
+        txt += ['    int nTrans=0, nActns=0;']
+        txt += ['    %s next_event = NULL;' % self.mkEvent()]
+        txt += ['    %s next_state = smi->currentState;' % self.mkState()]
+        txt += ['    const fsmStateMachine *fsm = smi->fsm;']
+        txt += ['    const fsmTransTab *tab = NULL;']
+        txt += ['    do {']
+        txt += ['        next_event = NULL;']
+        txt += ['        if (ev == NULL) {']
+        txt += ['            return next_state;']
+        txt += ['        }']
+        txt += ['        tab = next_state->transTab[ev->index];']
+        txt += ['        if (tab) {']
+        txt += ['            fsmActionType actionType = tab->ac_type;']
+        txt += ['            %s fn;' % self.mkFunc('Action')]
+        txt += ['            ++nTrans;']
+        txt += ['            switch (actionType) {']
+        txt += ['                case fsmActionClass:']
+        txt += ['                    k = tab->ac_code;']
+        txt += ['                    fn = fsm->actionTab[k];']
+        txt += ['                    if (smi->actionTab && smi->actionTab[k])']
+        txt += ['                        fn = smi->actionTab[k];']
+        txt += ['                    if (smi->reportFunc)']
+        txt += ['                        (*smi->reportFunc)(smi,']
+        txt += ['                            "%s(%s) -> %s",']
+        txt += ['                            smi->currentState->name,']
+        txt += ['                            ev->name,']
+        txt += ['                            fsm->actionTable[k]->name);']
+        txt += ['                    next_event = (*fn)(smi, smi->currentState, ev, pContext, smi->pPrivate);']
+        txt += ['                    ev = next_event;']
+        txt += ['                    break;']
+        txt += ['                case fsmActionTrans:']
+        txt += ['                    if (tab->ac_code)']
+        txt += ['                        next_state = fsm->stateTable[tab->ac_code];']
+        txt += ['                    nActns = 0;']
+        txt += ['                    for (j = 0; tab->ac_list[j]; ++ j) {']
+        txt += ['                        ++nActns;']
+        txt += ['                        k = tab->ac_list[j];']
+        txt += ['                        fn = fsm->actionTab[k];']
+        txt += ['                        if (smi->actionTab && smi->actionTab[k])']
+        txt += ['                            fn = smi->actionTab[k];']
+        txt += ['                        if (smi->reportFunc)']
+        txt += ['                            (*smi->reportFunc)(smi,']
+        txt += ['                                "%s(%s) [%s]",']
+        txt += ['                                smi->currentState->name,']
+        txt += ['                                ev->name,']
+        txt += ['                                fsm->actionTable[k]->name);']
+        txt += ['                        (void) (*fn)(smi, smi->currentState, ev, pContext, smi->pPrivate);']
+        txt += ['                    }']
+        txt += ['                    if (nActns == 0) /* no actions reported */']
+        txt += ['                        if (smi->reportFunc)']
+        txt += ['                            (*smi->reportFunc)(smi,']
+        txt += ['                                "%s(%s) [<no actions>]",']
+        txt += ['                                smi->currentState->name,']
+        txt += ['                                ev->name);']
+        txt += ['                    break;']
+        txt += ['            }']
+        txt += ['            break;']
+        txt += ['        }']
+        txt += ['        if (nTrans == 0) /* event not handled */']
+        txt += ['            if (smi->reportFunc)']
+        txt += ['                (*smi->reportFunc)(smi,']
+        txt += ['                    "%s(%s) [<unhandled>]",']
+        txt += ['                    smi->currentState->name,']
+        txt += ['                    ev->name);']
+        txt += ['    } while (next_event);']
+        txt += ['    return next_state;']
+        txt += ['}']
+        txt += ['']
+        txt += ['void %s(%s smi, %s ev, void *pContext)'\
+                % (self.mkFunc('InstanceRun'), self.mkName(), self.mkEvent())]
+        txt += ['{']
+        txt += ['    pQueueEntry event;']
+        txt += ['    if (smi->EmptyQueue.pHead) {']
+        txt += ['        event = smi->EmptyQueue.pHead;']
+        txt += ['        --smi->EmptyQueue.iLength;']
+        txt += ['        smi->EmptyQueue.pHead = event->next;']
+        txt += ['        if (smi->EmptyQueue.pHead == NULL)']
+        txt += ['            smi->EmptyQueue.pTail = NULL;']
+        txt += ['        else']
+        txt += ['            event->next = NULL;']
+        txt += ['    } else {']
+        txt += ['        event = calloc(1, sizeof(struct EventQueueEntry_t));']
+        txt += ['        /* TODO: check return */']
+        txt += ['        if (smi->reportFunc)']
+        txt += ['            (*smi->reportFunc)(smi,']
+        txt += ['                "new event queue entry in %s(%s)",']
+        txt += ['                smi->currentState->name,']
+        txt += ['                ev->name);']
+        txt += ['    }']
+        txt += ['    event->ev = ev;']
+        txt += ['    event->pContext = pContext;']
+        txt += ['    /* the current event is always on the queue */']
+        txt += ['    /* if queue is busy, we must have recursed */']
+        txt += ['    if (smi->EventQueue.pHead) {']
+        txt += ['       /* push this event on the tail and return */']
+        txt += ['        smi->EventQueue.pTail->next = event;']
+        txt += ['        smi->EventQueue.pTail = event;']
+        txt += ['        ++smi->EventQueue.iLength;']
+        txt += ['        if (smi->reportFunc)']
+        txt += ['            (*smi->reportFunc)(smi,']
+        txt += ['                "recursive event in %s(%s) is %s",']
+        txt += ['                smi->currentState->name,']
+        txt += ['                smi->EventQueue.pHead->ev->name,']
+        txt += ['                ev->name);']
+        txt += ['        return;']
+        txt += ['    } else {']
+        txt += ['       /* push this event on the queue and continue */']
+        txt += ['        smi->EventQueue.pHead = smi->EventQueue.pTail = event;']
+        txt += ['        ++smi->EventQueue.iLength;']
+        txt += ['    }']
+        txt += ['    while (event) {']
+        txt += ['        ev = event->ev;']
+        txt += ['        pContext = event->pContext;']
+        txt += ['        %s next_state = %s(smi, ev, pContext);'\
+                % (self.mkState(), self.mkFunc('RunStateEvent'))]
+        txt += ['        while (next_state != smi->currentState) {']
+        txt += ['            if (smi->fsm->exitEvent)']
+        txt += ['                %s(smi, smi->fsm->exitEvent, pContext);'\
+                % self.mkFunc('RunStateEvent')]
+        txt += ['            if (smi->reportFunc)']
+        txt += ['                (*smi->reportFunc)(smi,']
+        txt += ['                    "%s ==> %s",']
+        txt += ['                    smi->currentState->name,']
+        txt += ['                    next_state->name);']
+        txt += ['            smi->currentState = next_state;']
+        txt += ['            if (smi->fsm->entryEvent)']
+        txt += ['                next_state = %s(smi, smi->fsm->entryEvent, pContext);'\
+                % self.mkFunc('RunStateEvent')]
+        txt += ['        }']
+        txt += ['        /* push current event onto empty queue */']
+        txt += ['        if (smi->EmptyQueue.pHead) {']
+        txt += ['            smi->EmptyQueue.pTail->next = event;']
+        txt += ['            smi->EmptyQueue.pTail = event;']
+        txt += ['            return;']
+        txt += ['        } else {']
+        txt += ['            smi->EmptyQueue.pHead = smi->EmptyQueue.pTail = event;']
+        txt += ['        }']
+        txt += ['        ++smi->EmptyQueue.iLength;']
+        txt += ['        /* pop the current event off the event queue */']
+        txt += ['        --smi->EventQueue.iLength;']
+        txt += ['        smi->EventQueue.pHead = event->next;']
+        txt += ['        if (smi->EventQueue.pHead == NULL)']
+        txt += ['            smi->EventQueue.pTail = NULL;']
+        txt += ['        /* new event is on the head of the queue */']
+        txt += ['        event = smi->EventQueue.pHead;']
+        txt += ['    }']
+        txt += ['}']
+        txt += ['']
+        txt += ['void %s(' % self.mkFunc('ClassSetAction')]
+        txt += ['        %s action,' % self.mkAction()]
+        txt += ['        %s func)' % self.mkFunc('Action')]
+        txt += ['{']
+        txt += ['    if (action->index > 0 && action->index <= %s)'\
+                % self.mkName('NUM_ACTIONS')]
+        txt += ['        action_funcs[action->index] = func;']
+        txt += ['}']
+        txt += ['']
+        txt += ['void %s(' % self.mkFunc('InstanceSetAction')]
+        txt += ['        %s smi,' % self.mkName()]
+        txt += ['        %s action,' % self.mkAction()]
+        txt += ['        %s func)' % self.mkFunc('Action')]
+        txt += ['{']
+        txt += ['    if (action->index > 0 && action->index <= %s) {'\
+                % self.mkName('NUM_ACTIONS')]
+        txt += ['        if (smi->actionTab == NULL)']
+        txt += ['            smi->actionTab = (%s *) calloc(%s + 1, sizeof(%s));'\
+                % (self.mkFunc('Action'), self.mkName('NUM_ACTIONS'), self.mkFunc('Action'))]
+        txt += ['        smi->actionTab[action->index] = func;']
+        txt += ['    }']
+        txt += ['}']
+        txt += ['', '/* Report Function accessors */']
+        txt += ['void %s(%s smi,'\
+                % (self.mkFunc('SetReportFunc'), self.mkName())]
+        txt += ['    void (*reportFunc)(%s smi, const char *fmt, ...))'\
+                % (self.mkName())]
+        txt += ['{']
+        txt += ['    smi->reportFunc = reportFunc;']
+        txt += ['}']
+        txt += ['void (*%s(%s smi))(%s smi, const char *fmt, ...)'\
+                % (self.mkFunc('GetReportFunc'), self.mkName(), self.mkName())]
+        txt += ['{']
+        txt += ['    return smi->reportFunc;']
+        txt += ['}']
+        txt += ['', '/* Private data accessors */']
+        txt += ['void %s(%s smi, void *data, void (*pKiller)(void *))' % (self.mkFunc('SetPrivate'), self.mkName())]
+        txt += ['{']
+        txt += ['    smi->pPrivate = data;']
+        txt += ['    smi->pKiller = pKiller;']
+        txt += ['}']
+        txt += ['void *%s(%s smi)' % (self.mkFunc('GetPrivate'), self.mkName())]
+        txt += ['{']
+        txt += ['    return smi->pPrivate;']
+        txt += ['}']
+        txt += ['const char *%s(%s smi)' % (self.mkFunc('GetName'), self.mkName())]
+        txt += ['{']
+        txt += ['    return smi->name;']
+        txt += ['}']
+        return txt
