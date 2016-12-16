@@ -74,24 +74,24 @@ class StateMachine_GCC(StateMachine_Text):
         hdr += ['#define %s_H' % self.uname]
         # States
         hdr += ['', '/* States */']
-        hdr += ['typedef struct %s_t *%s;'\
+        hdr += ['typedef const struct %s_t *%s;'\
                 % (self.mkState(), self.mkState())]
         for item in stts:
-            hdr += ['extern  const %s %s;'\
+            hdr += ['extern const %s %s;'\
                     % (self.mkState(), self.mkState(item[0]))]
         # Events
         hdr += ['', '/* Events */']
-        hdr += ['typedef struct %s_t *%s;'\
+        hdr += ['typedef const struct %s_t *%s;'\
                 % (self.mkEvent(), self.mkEvent())]
         for item in evts:
-            hdr += ['extern  const %s %s;'\
+            hdr += ['extern const %s %s;'\
                     % (self.mkEvent(), self.mkEvent(item[0]))]
         # Actions
         hdr += ['', '/* Actions */']
-        hdr += ['typedef struct %s_t *%s;'\
+        hdr += ['typedef const struct %s_t *%s;'\
                 % (self.mkAction(), self.mkAction())]
         for item in acts:
-            hdr += ['extern  const %s %s;'\
+            hdr += ['extern const %s %s;'\
                     % (self.mkAction(), self.mkAction(item[0]))]
         # Instance
         hdr += ['', '/* Statemachine Instance */']
@@ -574,7 +574,7 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['static char *action_names[] = {']
         txt += ['    0,']
         for item in acts:
-            txt += ['    "%s",' % self.mkAction(item[0])]
+            txt += ['    "%s",' % (item[0])]
         txt += ['    0', '};', '']
         return txt
 
@@ -606,7 +606,7 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['static char *event_names[] = {']
         txt += ['    0,']
         for item in evts:
-            txt += ['    "%s",' % self.mkEvent(item[0])]
+            txt += ['    "%s",' % (item[0])]
         txt += ['    0', '};', '']
         return txt
 
@@ -637,7 +637,7 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['']
         txt += ['static char *state_names[] = {', '    0,']
         for item in stts:
-            txt += ['    "%s",' % self.mkState(item[0])]
+            txt += ['    "%s",' % (item[0])]
         txt += ['    0', '};', '']
         return txt
 
@@ -1138,7 +1138,7 @@ class StateMachine_GCC3(StateMachine_GCC):
                     (self.mkAction(),
                      self.mkAction(action.name),
                      self.mkAction(action.name),
-                     self.mkAction(action.name))]
+                     action.name)]
         for action in self.Actions():
             txt += ['const %s %s = &s%s;' %
                     (self.mkAction(),
@@ -1169,7 +1169,7 @@ class StateMachine_GCC3(StateMachine_GCC):
                     (self.mkEvent(),
                      self.mkEvent(event.name),
                      self.mkEvent(event.name),
-                     self.mkEvent(event.name))]
+                     event.name)]
         for event in self.Events():
             txt += ['const %s %s = &s%s;' %
                     (self.mkEvent(),
@@ -1203,7 +1203,7 @@ class StateMachine_GCC3(StateMachine_GCC):
         for state in self.States():
             txt += ['static struct %s_t const s%s = {' % (self.mkState(), self.mkState(state))]
             txt += ['    .index=e%s,' % (self.mkState(state.name))]
-            txt += ['    .name="%s",' % (self.mkState(state))]
+            txt += ['    .name="%s",' % (state.name)]
             txt += ['    .transTab={']
             txt += ['                   NULL,']
             for event in self.Events():
