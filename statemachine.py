@@ -717,7 +717,7 @@ class StateMachine_Python(StateMachine_Text):
             txt += ['    def %s(context, state, event):' % action[0]]
             line = '"State %%-%ds event %%-%ds: %s" %% (state, event)' % (slen, elen, action[0])
             txt += ['        print %s' % line]
-            txt += ['        return "%s"' % action[1][0][0]]
+            txt += ['        return "%s"' % action[1][0]]
         # print "Actions:", action_list
         for action in action_list:
             txt += ['    def %s(context, state, event):' % action]
@@ -834,7 +834,7 @@ class StateMachine_TCL(StateMachine_Text):
             line = 'State [format "%%-%ds" ${state}] event [format "%%-%ds" ${event}]: %s' %\
                     (slen, elen, action[0])
             txt += ['        puts "%s"' % line]
-            txt += ['        return "%s"' % action[1][0][0]]
+            txt += ['        return "%s"' % action[1][0]]
             txt += ['    }']
         # print "Actions:", action_list
         for action in action_list:
