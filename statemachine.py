@@ -1013,4 +1013,3 @@ if __name__ == "__main__":
     sm.addTransition(Transition("billState", "fredEvent", "do_something", "fredState"))
     sm.addClassifier(Classifier("billState", "fredEvent", "do_decide", "nextEvent"))
     sm.printit()
-

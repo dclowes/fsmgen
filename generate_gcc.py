@@ -70,8 +70,8 @@ class StateMachine_GCC(StateMachine_Text):
 
     def Generate_Hdr(self, stts, evts, acts):
         hdr = []
-        hdr += ['#ifndef %s_H' % self.uname]
-        hdr += ['#define %s_H' % self.uname]
+        hdr += ['#ifndef %s_FSM_H' % self.uname]
+        hdr += ['#define %s_FSM_H' % self.uname]
         # States
         hdr += ['', '/* States */']
         hdr += ['typedef const struct %s_t *%s;'\
@@ -143,7 +143,7 @@ class StateMachine_GCC(StateMachine_Text):
         hdr += ['void *%s(%s smi);' % (self.mkFunc('GetPrivate'), self.mkName())]
         hdr += ['const char *%s(%s smi);' % (self.mkFunc('GetName'), self.mkName())]
 
-        hdr += ['', '#endif /* %s_H */' % self.uname]
+        hdr += ['', '#endif /* %s_FSM_H */' % self.uname]
         return hdr
 
     def Absorb_Skel(self, file_name):
@@ -313,6 +313,8 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['    if (smi == NULL)']
         txt += ['        return NULL;']
         txt += ['    /* TODO initialisation */']
+        txt += ['    if (action_funcs[0] == NULL)']
+        txt += ['        %s();' % (self.mkFunc('ClassInit'))]
         txt += ['    smi->name = strdup(name);']
         txt += ['    smi->fsm = &fsm_%s;' % self.name]
         txt += ['    smi->currentState = initial;']
@@ -1094,8 +1096,8 @@ class StateMachine_GCC3(StateMachine_GCC):
 
     def gen_hdr(self):
         hdr = []
-        hdr += ['#ifndef %s_H' % self.uname]
-        hdr += ['#define %s_H' % self.uname]
+        hdr += ['#ifndef %s_FSM_H' % self.uname]
+        hdr += ['#define %s_FSM_H' % self.uname]
         hdr += ['']
         hdr += self.gen_hdr_states()
         hdr += ['']
@@ -1105,7 +1107,7 @@ class StateMachine_GCC3(StateMachine_GCC):
         hdr += ['']
         hdr += self.gen_hdr_funcs()
         hdr += ['']
-        hdr += ['#endif /* %s_H */' % self.uname]
+        hdr += ['#endif /* %s_FSM_H */' % self.uname]
         return hdr
 
     def gen_bdy_prefix(self):
@@ -1544,6 +1546,8 @@ class StateMachine_GCC3(StateMachine_GCC):
         txt += ['    if (smi == NULL)']
         txt += ['        return NULL;']
         txt += ['    /* TODO initialisation */']
+        txt += ['    if (action_funcs[0] == NULL)']
+        txt += ['        %s();' % (self.mkFunc('ClassInit'))]
         txt += ['    smi->name = strdup(name);']
         txt += ['    smi->fsm = &fsm_%s;' % self.name]
         txt += ['    smi->currentState = initial;']
