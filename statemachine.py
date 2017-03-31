@@ -606,7 +606,7 @@ class StateMachine_HTML(StateMachine_Text):
         txt += ['  rankdir=LR;']
         txt += ['  node [shape=plaintext];']
         txt += ['  labelloc="t";']
-        txt += ['  label=<<B>%s</B>>' % self.name]
+        txt += ['  label=<<B>%s</B>>' % self.name.upper()]
         txt += ['']
         colors = ['red', 'green', 'blue', 'orange', 'purple', 'magenta', 'cyan', 'yellow']
         for state in the_states:
