@@ -168,6 +168,9 @@ class StateMachine_GCC(StateMachine_Text):
                 self.code_blocks[target] = []
                 continue
             if "END CUSTOM:" in line:
+                if len(self.code_blocks[target]) == 1:
+                    if self.code_blocks[target][0] == "    return NULL;":
+                        del self.code_blocks[target]
                 target = None
                 continue
             if target:
@@ -178,6 +181,7 @@ class StateMachine_GCC(StateMachine_Text):
     def Generate_Skel(self):
         hdr = []
         txt = []
+        code_blocks = self.code_blocks
         txt += ['#include "%s.fsm.h"' % self.name]
         txt += ['#include <stdlib.h>']
         txt += ['/* BEGIN CUSTOM: include files {{{*/']
@@ -291,14 +295,18 @@ class StateMachine_GCC(StateMachine_Text):
             txt += [' * vim: ft=c ts=8 sts=4 sw=4 et cindent']
             txt += [' */']
         txt += ['/* END CUSTOM: control code }}}*/']
+        lines_parked = 0
         if len(self.code_blocks) > 0:
             txt += ['#if 0 /* BEGIN PARKING LOT {{{*/']
             for block in self.code_blocks.keys():
                 txt += ['/* BEGIN CUSTOM: %s {{{*/' % block]
+                lines_parked += len(self.code_blocks[block])
                 txt += self.code_blocks[block]
                 txt += ['/* END CUSTOM: %s }}}*/' % block]
                 del self.code_blocks[block]
             txt += ['#endif /* END PARKING LOT }}}*/']
+            print "Lines parked:", lines_parked
+        print "Custom Lines:", sum([len(code_blocks[block]) for block in code_blocks])
         return (hdr, txt)
 
     def Generate_Code(self):
@@ -1301,6 +1309,8 @@ class StateMachine_GCC3(StateMachine_GCC):
 
     def gen_bdy_skel(self):
         txt = []
+        code_blocks = self.code_blocks
+        lines_emitted = sum([len(code_blocks[block]) for block in code_blocks])
         txt += ['#include <stdlib.h>']
         txt += ['/* BEGIN CUSTOM: include files {{{*/']
         if 'include files' in self.code_blocks:
@@ -1401,7 +1411,11 @@ class StateMachine_GCC3(StateMachine_GCC):
             txt += [' * vim: ft=c ts=8 sts=4 sw=4 et cindent']
             txt += [' */']
         txt += ['/* END CUSTOM: control code }}}*/']
+        lines_parked = 0
         if len(self.code_blocks) > 0:
+            print "Blocks Parked:", sorted(self.code_blocks.keys())
+            lines_parked = sum([len(self.code_blocks[block]) for block in self.code_blocks])
+            print "Lines parked:", lines_parked
             txt += ['#if 0 /* BEGIN PARKING LOT {{{*/']
             for block in self.code_blocks.keys():
                 txt += ['/* BEGIN CUSTOM: %s {{{*/' % block]
@@ -1409,6 +1423,7 @@ class StateMachine_GCC3(StateMachine_GCC):
                 txt += ['/* END CUSTOM: %s }}}*/' % block]
                 del self.code_blocks[block]
             txt += ['#endif /* END PARKING LOT }}}*/']
+        print "Custom Lines:", lines_emitted
         return txt
 
     def gen_skl(self):
