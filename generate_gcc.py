@@ -24,6 +24,7 @@ class StateMachine_GCC(StateMachine_Text):
         self.prefix = 'FSM_'
         self.prefix = ''
         self.code_blocks = {}
+        self.done_blocks = []
 
     def mkFunc(self, name=None):
         if name:
@@ -202,6 +203,7 @@ class StateMachine_GCC(StateMachine_Text):
 #            code[-1] += ';'
 #            txt += code
 #        txt += ['']
+        txt += ['/* @brief private data type used in action routines */']
         txt += ['typedef %s_PRIVATE_DATA *pPRIVATE_DATA;' % self.mkName()]
         txt += ['']
         txt += ['/* BEGIN CUSTOM: forward declarations {{{*/']
@@ -1307,26 +1309,29 @@ class StateMachine_GCC3(StateMachine_GCC):
         txt += self.gen_bdy_unit_test()
         return txt
 
+    def gen_bdy_block(self, indent, block):
+        txt = ['%s/* BEGIN CUSTOM: %s {{{ */' % (indent, block)]
+        if block in self.code_blocks:
+            txt += self.code_blocks[block]
+            self.done_blocks.append(block)
+        elif block.endswith('action code'):
+            txt += ['%sreturn NULL;' % (indent)]
+        txt += ['%s/* END CUSTOM: %s }}} */' % (indent, block)]
+        return txt
+
     def gen_bdy_skel(self):
         txt = []
+        self.done_blocks = []
         code_blocks = self.code_blocks
         lines_emitted = sum([len(code_blocks[block]) for block in code_blocks])
         txt += ['#include <stdlib.h>']
-        txt += ['/* BEGIN CUSTOM: include files {{{*/']
-        if 'include files' in self.code_blocks:
-            txt += self.code_blocks['include files']
-            del self.code_blocks['include files']
-        txt += ['/* END CUSTOM: include files }}}*/']
+        txt += self.gen_bdy_block('', 'include files')
         txt += ['']
+        txt += ['/* @brief private data type used in action routines */']
         txt += ['typedef %s_PRIVATE_DATA *pPRIVATE_DATA;' % self.mkName()]
         txt += ['']
-        txt += ['/* BEGIN CUSTOM: forward declarations {{{*/']
-        if 'forward declarations' in self.code_blocks:
-            txt += self.code_blocks['forward declarations']
-            del self.code_blocks['forward declarations']
-        else:
-            txt += ['/* Place forward declarations, used in the action code, here */']
-        txt += ['/* END CUSTOM: forward declarations }}}*/']
+        txt += ['/* Place forward declarations, used in the action code, here */']
+        txt += self.gen_bdy_block('', 'forward declarations')
         txt += ['']
         for action in self.Actions():
             name = action.name
@@ -1343,13 +1348,7 @@ class StateMachine_GCC3(StateMachine_GCC):
             txt += self.mkActionFunc(name)
             txt += ['{']
             txt += ['    pPRIVATE_DATA self = (pPRIVATE_DATA) pPrivate;']
-            txt += ['    /* BEGIN CUSTOM: %s action code {{{*/' % name]
-            if '%s action code' % name in self.code_blocks:
-                txt += self.code_blocks['%s action code' % name]
-                del self.code_blocks['%s action code' % name]
-            else:
-                txt += ['    return NULL;']
-            txt += ['    /* END CUSTOM: %s action code }}}*/' % name]
+            txt += self.gen_bdy_block('    ', '%s action code' % name)
             txt += ['}']
             txt += ['']
         txt += ['/*']
@@ -1377,53 +1376,53 @@ class StateMachine_GCC3(StateMachine_GCC):
         txt += ['    return smi;']
         txt += ['}']
         txt += ['']
-        txt += ['/* BEGIN CUSTOM: control code {{{*/']
-        if 'control code' in self.code_blocks:
-            txt += self.code_blocks['control code']
-            del self.code_blocks['control code']
-        else:
-            txt += ['/* Place function definitions, used in the action code, here */']
-            txt += ['']
-            txt += ['#ifdef UNIT_TEST']
-            txt += ['/* Place unit test code here */']
-            txt += ['']
-            txt += ['/* Place unit test code main code here */']
-            txt += ['int main(int argc, char *argv[])']
-            txt += ['{']
-            txt += ['    %s smi;' % self.mkName()]
-            txt += ['    %s_PRIVATE_DATA private_data;' % self.mkName()]
-            txt += ['']
-            txt += ['    %s();' % self.mkFunc('ClassInit')]
-            txt += ['    memset(&private_data, 0, sizeof(private_data));']
-            txt += ['    smi = make(']
-            txt += ['        "test", %s,' % self.mkState('')]
-            txt += ['        &private_data, NULL);']
-            txt += ['    %s(smi,' % self.mkFunc('SetReportFunc')]
-            txt += ['        NULL);']
-            txt += ['    /* TODO: test something */']
-            txt += ['    %s(smi);' % self.mkFunc('InstanceKill')]
-            txt += ['    return EXIT_SUCCESS;']
-            txt += ['}']
-            txt += ['']
-            txt += ['#endif /* UNIT_TEST */']
-            txt += ['']
-            txt += ['/*']
-            txt += [' * vim: ft=c ts=8 sts=4 sw=4 et cindent']
-            txt += [' */']
-        txt += ['/* END CUSTOM: control code }}}*/']
+        txt += ['/* Place function definitions, used in the action code, here */']
+        txt += self.gen_bdy_block('', 'control code')
+        txt += ['']
+        txt += ['#ifdef UNIT_TEST']
+        txt += ['']
+        txt += ['/* Place function definitions, used in the test code, here */']
+        txt += self.gen_bdy_block('', 'test code')
+        txt += ['']
+        txt += ['int main(int argc, char *argv[])']
+        txt += ['{']
+        txt += ['    %s smi;' % self.mkName()]
+        txt += ['    %s_PRIVATE_DATA private_data;' % self.mkName()]
+        txt += ['']
+        txt += ['    %s();' % self.mkFunc('ClassInit')]
+        txt += ['    memset(&private_data, 0, sizeof(private_data));']
+        txt += ['    smi = make(']
+        txt += ['        "test", %s,' % self.mkState('')]
+        txt += ['        &private_data, NULL);']
+        txt += ['    %s(smi,' % self.mkFunc('SetReportFunc')]
+        txt += ['        NULL);']
+        txt += ['']
+        txt += ['    /* test something */']
+        txt += self.gen_bdy_block('    ', 'main code')
+        txt += ['']
+        txt += ['    %s(smi);' % self.mkFunc('InstanceKill')]
+        txt += ['    return EXIT_SUCCESS;']
+        txt += ['}']
+        txt += ['']
+        txt += ['#endif /* UNIT_TEST */']
         lines_parked = 0
-        if len(self.code_blocks) > 0:
-            print "Blocks Parked:", sorted(self.code_blocks.keys())
-            lines_parked = sum([len(self.code_blocks[block]) for block in self.code_blocks])
+        parked = {}
+        for block in self.code_blocks:
+            if block not in self.done_blocks:
+                parked[block] = self.code_blocks[block]
+        if len(parked) > 0:
+            print "Blocks Parked:", sorted(parked.keys())
+            lines_parked = sum([len(self.code_blocks[block]) for block in parked])
             print "Lines parked:", lines_parked
             txt += ['#if 0 /* BEGIN PARKING LOT {{{*/']
-            for block in self.code_blocks.keys():
-                txt += ['/* BEGIN CUSTOM: %s {{{*/' % block]
-                txt += self.code_blocks[block]
-                txt += ['/* END CUSTOM: %s }}}*/' % block]
-                del self.code_blocks[block]
+            for block in parked.keys():
+                txt += self.gen_bdy_block('', block)
             txt += ['#endif /* END PARKING LOT }}}*/']
         print "Custom Lines:", lines_emitted
+        txt += ['']
+        txt += ['/*']
+        txt += [' * vim: ft=c ts=8 sts=4 sw=4 et cindent']
+        txt += [' */']
         return txt
 
     def gen_skl(self):
