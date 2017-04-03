@@ -280,7 +280,7 @@ class StateMachine_Text(StateMachine):
         the_events = sorted([e.name for e in self.events])
         txt = ['STATEMACHINE %s {' % self.name]
         if len(self.outputs) > 0:
-            txt += ['  OUPUT ' + ', '.join(self.outputs) + ';']
+            txt += ['  OUTPUT ' + ', '.join(self.outputs) + ';']
         txt += ['  STATES']
         for state in the_states:
             s = self.getState(state)

@@ -1,3 +1,6 @@
+# Author: Douglas Clowes (douglas.clowes@ansto.gov.au) Aug 2015
+# vim: ft=python ts=8 sts=4 sw=4 expandtab autoindent smartindent nocindent
+#
 from statemachine import Classifier
 from statemachine import Transition
 from statemachine import StateMachine_Text
