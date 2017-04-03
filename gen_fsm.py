@@ -713,65 +713,7 @@ def generate_source(the_fsm, SourceData, source_file):
     #
     # Generate the HTML
     #
-    TABLE_START = '<TABLE BORDER=0 ALIGN="center">\n'
-    TABLE_END = '</TABLE>\n'
-    HDR_FMT = '<P style="page-break-before: always" ALIGN="center">%s</P>\n'
-
-    text = open("%s.html" % dest_file, "w")
-    text.write('<HTML>\n')
-    text.write('<TITLE>Finite State Machine %s</TITLE>\n' % dest_file)
-
-    text.write('<P ALIGN="center">%s</P>\n' % 'Source Code')
-
-    text.write(TABLE_START)
-    text.write('<TR><TD ALIGN="left">\n')
-    text.write('<TABLE BORDER=1 ALIGN="center">\n')
-    text.write('<TR><TH ALIGN="center">What you wrote</TH><TH ALIGN="center">What I saw</TH></TR>\n')
-    text.write('<TR><TD ALIGN="left" VALIGN="top">\n')
-    text.write('<PRE>\n' + '\n'.join(SourceData) + '\n</PRE>\n')
-    text.write('</TD><TD ALIGN="left">\n')
-    # Insert the Reformatted State Machine text
-    text.write('<PRE>\n' + '\n'.join(txt_text) + '\n</PRE>\n')
-    text.write('</TD></TR></TABLE>\n')
-    text.write('</TD></TR>\n')
-
-    text.write(TABLE_END + HDR_FMT % 'State Diagram' + TABLE_START)
-
-    text.write('<TR><TD ALIGN="center">\n')
-    text.write('<img src="%s.svg" alt="%s.svg"/>\n' % (basename, basename))
-    text.write('</TD></TR>\n')
-    text.write(TABLE_END + HDR_FMT % 'State Diagram' + TABLE_START)
-    text.write('<TR><TD ALIGN="center">\n')
-    text.write('<img src="%s.png" alt="%s.png"/>\n' % (basename, basename))
-    text.write('</TD></TR>\n')
-
-    text.write(TABLE_END + HDR_FMT % 'State Table 1' + TABLE_START)
-
-    text.write('<TR><TD ALIGN="center">\n')
-    txt = fsm_html.StateTable1()
-    text.write('\n'.join(txt))
-    text.write('</TD></TR>\n')
-
-    text.write(TABLE_END + HDR_FMT % 'State Table 2' + TABLE_START)
-
-    text.write('<TR><TD ALIGN="center">\n')
-    txt = fsm_html.StateTable2()
-    text.write('\n'.join(txt))
-    text.write('</TD></TR>\n')
-
-    text.write(TABLE_END + HDR_FMT % 'State Table 3' + TABLE_START)
-
-    text.write('<TR><TD ALIGN="center">\n')
-    txt = fsm_html.StateTable3()
-    text.write('\n'.join(txt))
-    text.write('</TD></TR>\n')
-
-    text.write('</TABLE>\n')
-    text.write('</HTML>\n')
-    text.close()
-    pdf_cmd = 'wkhtmltopdf -T 10mm -B 10mm %s.html %s.pdf' % (dest_file, dest_file)
-    print pdf_cmd
-    #os.system(pdf_cmd)
+    fsm_html.Generate(dest_file, SourceData, txt_text)
 
     #
     # Generate the TCL
