@@ -328,6 +328,7 @@ class StateMachine_Text(StateMachine):
                 lines[-1] += ','
             txt += lines
         for state in the_states:
+            txt += ['']
             s = self.getState(state)
             if s and len(s.base_list) > 0:
                 txt += ['  State %s (%s) {' % (state, ', '.join(s.base_list))]
@@ -340,7 +341,7 @@ class StateMachine_Text(StateMachine):
                 if isinstance(block, Classifier):
                     line += ' -> %s' % ', '.join(block.actions)
                     if len(block.targets) > 0:
-                        next_events = sorted([e for e in block.targets])
+                        next_events = [e for e in block.targets]
                         line += ' --> %s' % ', '.join(next_events)
                 else:
                     if len(block.actions) > 0:
@@ -352,6 +353,7 @@ class StateMachine_Text(StateMachine):
         for action in sorted(self.actions, key=lambda action: action.name.lower()):
             # print "##Action:", repr(action)
             if len(action.code_text) > 0:
+                txt += ['']
                 txt += ['  CODE %s {' % (action.name)]
                 for code_type in sorted(action.code_text):
                     txt += ['    @%s' % code_type]
@@ -360,6 +362,7 @@ class StateMachine_Text(StateMachine):
                     txt += ['    @END']
                 txt += ['  }']
         for test in self.tests:
+            txt += ['']
             txt += ['  Test %s;' % ',\n    '.join(test.tests)]
         txt += ['}']
         return txt
