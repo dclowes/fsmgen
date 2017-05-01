@@ -254,7 +254,7 @@ class StateMachine_GCC(StateMachine_Text):
         txt += ['']
         txt += ['/*']
         txt += [' * Example function to construct the instance']
-        txt += [' * Aslo sets the private data and private destructor (or NULL)']
+        txt += [' * Also sets the private data and private destructor (or NULL)']
         txt += [' */']
         txt += ['static %s make(' % self.mkName()]
         txt += ['    char *name,']
