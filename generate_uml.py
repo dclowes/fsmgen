@@ -12,13 +12,15 @@ class StateMachine_UML(StateMachine_Text):
         self.Inheritance()
 
     def Generate(self):
-        the_states = sorted([s.name for s in self.states])
+        the_states = {}
+        for state in self.states:
+            the_states[state.name] = state
         txt = ['@startuml']
         txt += ['title %s' % self.uname]
-        for state in the_states:
-            txt += ['state %s' % state]
+        for state in sorted(the_states):
+            txt += ['state %s : %s' % (state, '\\n'.join(the_states[state].comments))]
         txt += ['']
-        for state in the_states:
+        for state in sorted(the_states):
             the_blocks = [b for b in sorted(self.classifiers) if b.source == state]
             for block in the_blocks:
                 if len(block.targets) == 0:
