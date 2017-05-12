@@ -99,6 +99,8 @@ def Build_StateMachine(sm):
     for s in new_sm.states:
         if s.name in sm['State_Comments']:
             s.comments += sm['State_Comments'][s.name]
+        if s.name in sm['State_Flags']:
+            s.flags += sm['State_Flags'][s.name]
     for e in new_sm.events:
         if e.name in sm['Event_Comments']:
             e.comments += sm['Event_Comments'][e.name]
@@ -386,15 +388,30 @@ def p_state_list(p):
 def p_state_type(p):
     '''
     state_type : id_or_str
+               | id_or_str LPAREN flag_list RPAREN
                | state_type text_string
     '''
     p[0] = p[1]
     if p[0] not in Statemachine['States']:
         Statemachine['States'].append(p[0])
+    if len(p) == 5:
+        if p[1] not in Statemachine['State_Flags']:
+            Statemachine['State_Flags'][p[1]] = []
+        Statemachine['State_Flags'][p[1]] += p[3]
     if len(p) == 3:
         if p[1] not in Statemachine['State_Comments']:
             Statemachine['State_Comments'][p[1]] = []
         Statemachine['State_Comments'][p[1]].append(p[2])
+
+def p_flag_list(p):
+    '''
+    flag_list : id_or_str
+               | flag_list comma id_or_str
+    '''
+    if len(p) == 4:
+        p[0] = p[1] + [p[3]]
+    else:
+        p[0] = [p[1]]
 
 def p_event_list(p):
     '''
@@ -645,6 +662,7 @@ def process_source(source_file):
     Statemachine['Outputs'] = []
     Statemachine['States'] = []
     Statemachine['State_Comments'] = {}
+    Statemachine['State_Flags'] = {}
     Statemachine['Events'] = []
     Statemachine['Event_Comments'] = {}
     Statemachine['Actions'] = []

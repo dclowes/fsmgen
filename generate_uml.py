@@ -6,6 +6,10 @@ from statemachine import Action, Classifier, Transition
 from statemachine import Event, State
 from statemachine import StateMachine, StateMachine_Text
 
+doActions = True
+doClassifiers = False
+doSelf = False
+
 class StateMachine_UML(StateMachine_Text):
     def __init__(self, other):
         StateMachine_Text.__init__(self, other)
@@ -19,39 +23,42 @@ class StateMachine_UML(StateMachine_Text):
         txt += ['title %s' % self.uname]
         for state in sorted(the_states):
             txt += ['state %s : %s' % (state, '\\n'.join(the_states[state].comments))]
+            if 'INITIAL' in [f.upper() for f in the_states[state].flags]:
+                txt += ["[*] -> %s" % state]
         txt += ['']
         for state in sorted(the_states):
-            the_blocks = [b for b in sorted(self.classifiers) if b.source == state]
-            for block in the_blocks:
-                if len(block.targets) == 0:
-                    txt += ['%s --> %s : %s(%s)' %
+            if doClassifiers: # Classifiers
+                the_blocks = [b for b in sorted(self.classifiers) if b.source == state]
+                for block in the_blocks:
+                    line = '%s --> %s : %s' %\
                             (state,
-                             state,
-                             block.event,
-                             ','.join(block.actions))]
-                else:
-                    txt += ['%s --> %s : %s(%s):\\n%s' %
-                            (state,
-                             state,
-                             block.event,
-                             ','.join(block.actions),
-                             ',\\n'.join(block.targets))]
+                                state,
+                                block.event)
+                    if doActions:
+                        if len(block.targets) == 0:
+                            line += '(%s)' %\
+                                    ','.join(block.actions)
+                        else:
+                            line += '(%s):\\n%s' %\
+                                    (','.join(block.actions),
+                                    ',\\n'.join(block.targets))
+                    txt.append(line)
             the_blocks = [b for b in sorted(self.transitions) if b.source == state]
             for block in the_blocks:
                 if len(block.targets) == 0:
                     tgts = state
+                    if doSelf == False:
+                        continue
                 else:
                     tgts = ','.join(block.targets)
-                if len(block.actions) == 0:
-                    txt += ['%s --> %s : %s' %
-                            (state,
-                             tgts,
-                             block.event)]
-                else:
-                    txt += ['%s --> %s : %s\\n(%s)' %
-                            (state,
-                             tgts,
-                             block.event,
-                             ',\\n'.join(block.actions))]
+                line = '%s --> %s : %s' %\
+                        (state,
+                            tgts,
+                            block.event)
+                if doActions:
+                    if len(block.actions) > 0:
+                        line += '\\n(%s)' %\
+                                ',\\n'.join(block.actions)
+                txt.append(line)
         txt += ['@enduml']
         return txt

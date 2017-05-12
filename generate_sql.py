@@ -40,11 +40,13 @@ class StateMachine_SQL(StateMachine_Text):
                 item.comments = comments.split("\n")
             self.addEvent(item)
 
-        curs.execute("SELECT name, bases, comments FROM states")
-        for name, bases, comments in curs.fetchall():
+        curs.execute("SELECT name, bases, flags, comments FROM states")
+        for name, bases, flags, comments in curs.fetchall():
             item = State(name)
             if len(bases) > 0:
                 item.base_list = bases.split("\n")
+            if len(flags) > 0:
+                item.flags = flags.split(",")
             if len(comments) > 0:
                 item.comments = comments.split("\n")
             self.addState(item)
@@ -76,7 +78,7 @@ class StateMachine_SQL(StateMachine_Text):
         conn = sqlite3.connect(dest_file)
         curs = conn.cursor()
         curs.execute("CREATE TABLE statemachine (name TEXT, comments TEXT)")
-        curs.execute("CREATE TABLE states (name TEXT, bases TEXT, comments TEXT)")
+        curs.execute("CREATE TABLE states (name TEXT, bases TEXT, flags TEXT, comments TEXT)")
         curs.execute("CREATE TABLE events (name TEXT, comments TEXT)")
         curs.execute("CREATE TABLE actions (name TEXT, comments TEXT)")
         curs.execute("CREATE TABLE code (name TEXT, type TEXT, lines TEXT)")
@@ -86,9 +88,10 @@ class StateMachine_SQL(StateMachine_Text):
 
         curs.execute("INSERT INTO statemachine VALUES (:1, :2)", (self.name, "\n".join(self.comments)))
         for s in sorted(self.states, key=lambda state: state.name):
-            curs.execute("INSERT INTO states VALUES (:1, :2, :3)",
+            curs.execute("INSERT INTO states VALUES (:1, :2, :3, :4)",
                          (s.name,
                           "\n".join(s.base_list),
+                          ",".join(sorted(s.flags)),
                           "\n".join(s.comments)))
         for e in sorted(self.events, key=lambda event: event.name):
             curs.execute("INSERT INTO events VALUES (:1, :2)",

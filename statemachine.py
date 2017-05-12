@@ -37,6 +37,7 @@ class Event(object):
 class State(object):
     def __init__(self, name, base_list=None):
         self.name = name
+        self.flags = []
         self.comments = []
         if base_list is None:
             self.base_list = []
@@ -285,6 +286,8 @@ class StateMachine_Text(StateMachine):
         for state in the_states:
             s = self.getState(state)
             lines = ['    %s' % state]
+            if len(s.flags) > 0:
+                lines[0] += '(' + ','.join(s.flags) + ')'
             if len(s.comments) == 0:
                 lines[0] += ' "No Comment"'
             elif len(s.comments) == 1:
