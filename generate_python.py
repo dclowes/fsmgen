@@ -124,5 +124,5 @@ class StateMachine_Python(StateMachine_Text):
                         txt2 += ['        ' + code[min_wh:]]
         if len(txt2) > 1:
             txt += txt2
-        txt += ['# vim: ft=python ts=8 sts=4 sw=4 expandtab autoindent smartindent nocindent']
+        txt += ['# %s: ft=python ts=8 sts=4 sw=4 expandtab autoindent smartindent nocindent' % 'vim']
         return txt

@@ -9,6 +9,15 @@ class StateMachine_TCL(StateMachine_Text):
     def __init__(self, other):
         StateMachine_Text.__init__(self, other)
         self.Inheritance()
+        self.script_context = False
+
+    def mkEvent(self, name=None):
+        return "'%s'" % name
+
+    def mkActionFunc(self, action):
+        txt = []
+        txt += ['proc %s {context state event} {' % action]
+        return txt
 
     def Generate_TCL(self):
         the_states = sorted([s.name for s in self.states])
@@ -54,13 +63,20 @@ class StateMachine_TCL(StateMachine_Text):
         txt += ['    set rule_count 0']
         txt += ['    while { ${next_event} != {} } {']
         txt += ['        set state_event [StateSwitch_%s ${context} ${state} ${next_event}]' % self.name]
-        txt += ['        set next_event [lindex ${state_event} 1]']
+        if self.script_context:
+            txt += ['        debug_log ${context} 1 "StateSwitch ${context} ${state} ${next_event} => ${state_event}"']
+        txt += ['        set next_state [lindex ${state_event} 0]']
         txt += ['        set rule_count [expr {${rule_count} + [lindex ${state_event} 2]}]']
-        txt += ['    }']
-        txt += ['    set next_state [lindex ${state_event} 0]']
-        txt += ['    if { ${next_state} != ${state} } {']
-        txt += ['        set state_event [StateSwitch_%s ${context} ${state} "Exit"]' % self.name]
-        txt += ['        set state_event [StateSwitch_%s ${context} ${next_state} "Entry"]' % self.name]
+        txt += ['        if { ${next_state} != ${state} } {']
+        txt += ['            set state_event [StateSwitch_%s ${context} ${state} "Exit"]' % self.name]
+        if self.script_context:
+            txt += ['            debug_log ${context} 1 "StateSwitch ${context} ${state} Exit => ${state_event}"']
+        txt += ['            set state_event [StateSwitch_%s ${context} ${next_state} "Entry"]' % self.name]
+        if self.script_context:
+            txt += ['            debug_log ${context} 1 "StateSwitch ${context} ${next_state} Entry => ${state_event}"']
+        txt += ['        }']
+        txt += ['        set next_event [lindex ${state_event} 1]']
+        txt += ['        set state ${next_state}']
         txt += ['    }']
         txt += ['    return [list ${next_state} ${next_event} ${rule_count}]']
         txt += ['}', '']
@@ -122,5 +138,63 @@ class StateMachine_TCL(StateMachine_Text):
         if len(txt2) > 1:
             txt += txt2
         txt += ['}']
+        return txt
+
+    def gen_bdy_block(self, indent, block):
+        txt = []
+        txt += ['%s# BEGIN CUSTOM: %s {{{' % (indent, block)]
+        if block in self.code_blocks:
+            txt += self.code_blocks[block]
+            self.done_blocks.append(block)
+        elif block.endswith('action code'):
+            txt += ['%sreturn {}' % (indent)]
+        txt += ['%s# END CUSTOM: %s }}}' % (indent, block)]
+        return txt
+
+    def Generate_Skel(self):
+        txt = []
+        self.done_blocks = []
+        code_blocks = self.code_blocks
+        lines_emitted = sum([len(code_blocks[block]) for block in code_blocks])
+        for action in self.Actions():
+            name = action.name
+            if self.isClassifier(name):
+                txt += ['# Classifier returns:']
+                for target in self.getTargets(name):
+                    txt += ['#    %s' % self.mkEvent(target)]
+            else:
+                txt += ['# Transition: returns NULL']
+            if len(action.comments) > 0:
+                txt += ['# Comments:']
+                for line in action.comments:
+                    txt += ['#    %s' % line]
+            txt += self.mkActionFunc(name)
+            if self.script_context:
+                txt += ['  set catch_status [ catch {']
+                txt += ['  debug_log ${context} 1 "Action: %s dev=${context}, state=${state}, event=${event}, sct=[sct]"' % (name)]
+                txt += self.gen_bdy_block('    ', '%s action code' % name)
+                txt += ['  } catch_message ]']
+                txt += ['  set tc_root ${context}']
+                txt += ['  handle_exception ${catch_status} ${catch_message}']
+            else:
+                txt += self.gen_bdy_block('    ', '%s action code' % name)
+            txt += ['}']
+            txt += ['']
+        lines_parked = 0
+        parked = {}
+        for block in self.code_blocks:
+            if block not in self.done_blocks:
+                parked[block] = self.code_blocks[block]
+        if len(parked) > 0:
+            print "Blocks Parked:", sorted(parked.keys())
+            lines_parked = sum([len(self.code_blocks[block]) for block in parked])
+            print "Lines parked:", lines_parked
+            txt += ['if {0} {', '# BEGIN PARKING LOT {{{']
+            for block in sorted(parked.keys()):
+                txt += self.gen_bdy_block('', block)
+            txt += ['# END PARKING LOT }}}', '}']
+        print "Custom Lines:", lines_emitted
+        txt += ['']
+        txt += ['# %s: ft=tcl ts=8 sts=4 sw=4 et nocindent' % 'vim']
         return txt
 

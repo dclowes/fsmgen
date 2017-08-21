@@ -25,8 +25,6 @@ class StateMachine_GCC(StateMachine_Text):
         self.Inheritance()
         self.prefix = 'FSM_'
         self.prefix = ''
-        self.code_blocks = {}
-        self.done_blocks = []
 
     def mkFunc(self, name=None):
         if name:
@@ -152,38 +150,6 @@ class StateMachine_GCC(StateMachine_Text):
         hdr += ['', '#endif /* %s_FSM_H */' % self.uname]
         return hdr
 
-    def Absorb_Skel(self, file_name):
-        '''
-        This method reads an existing skeleton file and loads self.code_blocks
-        with the code between custom code markers in the skeleton file.
-
-        This code can later be emitted in place of the boilerplate to preserve
-        custom code development if the state machine is later regenerated.
-        '''
-        import re
-        target = None
-        self.code_blocks = {}
-        try:
-            with open(file_name, "r") as fd:
-                lines = fd.read().splitlines()
-        except IOError:
-            lines = []
-        for line in lines:
-            if "BEGIN CUSTOM:" in line:
-                target = re.sub(r'.*BEGIN CUSTOM: (.*) {.*', r'\1', line)
-                self.code_blocks[target] = []
-                continue
-            if "END CUSTOM:" in line:
-                if len(self.code_blocks[target]) == 1:
-                    if self.code_blocks[target][0] == "    return NULL;":
-                        del self.code_blocks[target]
-                target = None
-                continue
-            if target:
-                self.code_blocks[target].append(line)
-#       for target in self.code_blocks:
-#           print "Target:", target, len(self.code_blocks[target])
-
     def Generate_Skel(self):
         hdr = []
         txt = []
@@ -299,13 +265,13 @@ class StateMachine_GCC(StateMachine_Text):
             txt += ['#endif /* UNIT_TEST */']
             txt += ['']
             txt += ['/*']
-            txt += [' * vim: ft=c ts=8 sts=4 sw=4 et cindent']
+            txt += [' * %s: ft=c ts=8 sts=4 sw=4 et cindent' % 'vim']
             txt += [' */']
         txt += ['/* END CUSTOM: control code }}}*/']
         lines_parked = 0
         if len(self.code_blocks) > 0:
             txt += ['#if 0 /* BEGIN PARKING LOT {{{*/']
-            for block in self.code_blocks.keys():
+            for block in sorted(self.code_blocks.keys()):
                 txt += ['/* BEGIN CUSTOM: %s {{{*/' % block]
                 lines_parked += len(self.code_blocks[block])
                 txt += self.code_blocks[block]

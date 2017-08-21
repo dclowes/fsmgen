@@ -417,13 +417,13 @@ class StateMachine_GCC3(StateMachine_GCC):
             lines_parked = sum([len(self.code_blocks[block]) for block in parked])
             print "Lines parked:", lines_parked
             txt += ['#if 0 /* BEGIN PARKING LOT {{{*/']
-            for block in parked.keys():
+            for block in sorted(parked.keys()):
                 txt += self.gen_bdy_block('', block)
             txt += ['#endif /* END PARKING LOT }}}*/']
         print "Custom Lines:", lines_emitted
         txt += ['']
         txt += ['/*']
-        txt += [' * vim: ft=c ts=8 sts=4 sw=4 et cindent']
+        txt += [' * %s: ft=c ts=8 sts=4 sw=4 et cindent' % 'vim']
         txt += [' */']
         return txt
 

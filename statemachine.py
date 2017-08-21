@@ -102,6 +102,8 @@ class StateMachine(object):
         self.classifiers = []
         self.action_list = []
         self.outputs = []
+        self.code_blocks = {}
+        self.done_blocks = []
 
     def __repr__(self):
         text = "name = %s" % repr(self.name)
@@ -240,7 +242,41 @@ class StateMachine_Text(StateMachine):
             self.transitions = other.transitions[:]
             self.classifiers = other.classifiers[:]
             self.action_list = other.action_list[:]
+            self.code_blocks = {}
+            self.done_blocks = []
             return
+
+    def Absorb_Skel(self, file_name):
+        '''
+        This method reads an existing skeleton file and loads self.code_blocks
+        with the code between custom code markers in the skeleton file.
+
+        This code can later be emitted in place of the boilerplate to preserve
+        custom code development if the state machine is later regenerated.
+        '''
+        import re
+        target = None
+        self.code_blocks = {}
+        try:
+            with open(file_name, "r") as fd:
+                lines = fd.read().splitlines()
+        except IOError:
+            lines = []
+        for line in lines:
+            if "BEGIN CUSTOM:" in line:
+                target = re.sub(r'.*BEGIN CUSTOM: (.*) {.*', r'\1', line)
+                self.code_blocks[target] = []
+                continue
+            if "END CUSTOM:" in line:
+                if len(self.code_blocks[target]) == 1:
+                    if self.code_blocks[target][0] == "    return NULL;":
+                        del self.code_blocks[target]
+                target = None
+                continue
+            if target:
+                self.code_blocks[target].append(line)
+#       for target in self.code_blocks:
+#           print "Target:", target, len(self.code_blocks[target])
 
     def Inheritance(self):
         '''
