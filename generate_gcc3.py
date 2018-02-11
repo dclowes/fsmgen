@@ -312,13 +312,13 @@ class StateMachine_GCC3(StateMachine_GCC):
         return txt
 
     def gen_bdy_block(self, indent, block):
-        txt = ['%s/* BEGIN CUSTOM: %s {{{ */' % (indent, block)]
+        txt = ['%s/* BEGIN CUSTOM: %s [[[ */' % (indent, block)]
         if block in self.code_blocks:
             txt += self.code_blocks[block]
             self.done_blocks.append(block)
         elif block.endswith('action code'):
             txt += ['%sreturn NULL;' % (indent)]
-        txt += ['%s/* END CUSTOM: %s }}} */' % (indent, block)]
+        txt += ['%s/* END CUSTOM: %s ]]] */' % (indent, block)]
         return txt
 
     def gen_bdy_skel(self):
@@ -390,11 +390,12 @@ class StateMachine_GCC3(StateMachine_GCC):
         txt += ['{']
         txt += ['    %s smi;' % self.mkName()]
         txt += ['    %s_PRIVATE_DATA private_data;' % self.mkName()]
+        txt += ['    %s initialState = NULL;' % self.mkState('')]
         txt += ['']
         txt += ['    %s();' % self.mkFunc('ClassInit')]
         txt += ['    memset(&private_data, 0, sizeof(private_data));']
         txt += ['    smi = make(']
-        txt += ['        "test", %s,' % self.mkState('')]
+        txt += ['        "test", initialState,']
         txt += ['        &private_data, NULL);']
         txt += ['    %s(smi,' % self.mkFunc('SetReportFunc')]
         txt += ['        NULL);']
@@ -416,14 +417,14 @@ class StateMachine_GCC3(StateMachine_GCC):
             print "Blocks Parked:", sorted(parked.keys())
             lines_parked = sum([len(self.code_blocks[block]) for block in parked])
             print "Lines parked:", lines_parked
-            txt += ['#if 0 /* BEGIN PARKING LOT {{{*/']
+            txt += ['#if 0 /* BEGIN PARKING LOT [[[ */']
             for block in sorted(parked.keys()):
                 txt += self.gen_bdy_block('', block)
-            txt += ['#endif /* END PARKING LOT }}}*/']
+            txt += ['#endif /* END PARKING LOT ]]] */']
         print "Custom Lines:", lines_emitted
         txt += ['']
         txt += ['/*']
-        txt += [' * %s: ft=c ts=8 sts=4 sw=4 et cindent' % 'vim']
+        txt += [' * %s: ft=c ts=8 sts=4 sw=4 et cindent fmr=[[[,]]]' % 'vim']
         txt += [' */']
         return txt
 

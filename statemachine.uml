@@ -1,0 +1,36 @@
+@startuml
+class statemachine
+statemachine : text name
+statemachine : text[] comments
+class fsm_state
+fsm_state : text name
+fsm_state : text[] bases
+fsm_state : text[] flags
+fsm_state : text[] comments
+class fsm_event
+fsm_event : text name
+fsm_event : text[] comments
+class fsm_transaction
+fsm_transaction : text name
+fsm_transaction : text[] comments
+fsm_transaction : text next_state
+fsm_transaction : text this_state
+fsm_transaction : text event
+fsm_transaction : text[] actions
+class fsm_action
+fsm_action : text name
+fsm_action : text[] comments
+class fsm_code
+fsm_code : text name
+fsm_code : text type
+fsm_code : text[] lines
+statemachine "1" o-- "many" fsm_transaction : has
+fsm_transaction "1" -- "1" fsm_state : from
+fsm_transaction "1" -- "0..1" fsm_state : to
+fsm_transaction "1" -- "1" fsm_event : on
+fsm_transaction "1" o-- "many" fsm_action : invoke
+fsm_action "1" *-- "many" fsm_code : as
+'event --> classification
+'fsm_state --> transaction
+'event --> transaction
+@enduml

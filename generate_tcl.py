@@ -142,13 +142,13 @@ class StateMachine_TCL(StateMachine_Text):
 
     def gen_bdy_block(self, indent, block):
         txt = []
-        txt += ['%s# BEGIN CUSTOM: %s {{{' % (indent, block)]
+        txt += ['%s# BEGIN CUSTOM: %s [[[' % (indent, block)]
         if block in self.code_blocks:
             txt += self.code_blocks[block]
             self.done_blocks.append(block)
         elif block.endswith('action code'):
             txt += ['%sreturn {}' % (indent)]
-        txt += ['%s# END CUSTOM: %s }}}' % (indent, block)]
+        txt += ['%s# END CUSTOM: %s ]]]' % (indent, block)]
         return txt
 
     def Generate_Skel(self):
@@ -171,7 +171,7 @@ class StateMachine_TCL(StateMachine_Text):
             txt += self.mkActionFunc(name)
             if self.script_context:
                 txt += ['  set catch_status [ catch {']
-                txt += ['  debug_log ${context} 1 "Action: %s dev=${context}, state=${state}, event=${event}, sct=[sct]"' % (name)]
+                txt += ['    debug_log ${context} 1 "Action: %s dev=${context}, state=${state}, event=${event}, sct=[sct]"' % (name)]
                 txt += self.gen_bdy_block('    ', '%s action code' % name)
                 txt += ['  } catch_message ]']
                 txt += ['  set tc_root ${context}']
@@ -189,12 +189,12 @@ class StateMachine_TCL(StateMachine_Text):
             print "Blocks Parked:", sorted(parked.keys())
             lines_parked = sum([len(self.code_blocks[block]) for block in parked])
             print "Lines parked:", lines_parked
-            txt += ['if {0} {', '# BEGIN PARKING LOT {{{']
+            txt += ['if {0} {', '# BEGIN PARKING LOT [[[']
             for block in sorted(parked.keys()):
                 txt += self.gen_bdy_block('', block)
-            txt += ['# END PARKING LOT }}}', '}']
+            txt += ['# END PARKING LOT ]]]', '}']
         print "Custom Lines:", lines_emitted
         txt += ['']
-        txt += ['# %s: ft=tcl ts=8 sts=4 sw=4 et nocindent' % 'vim']
+        txt += ['# %s: ft=tcl ts=8 sts=4 sw=4 et nocindent fmr=[[[,]]]' % 'vim']
         return txt
 

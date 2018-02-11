@@ -25,6 +25,7 @@ class StateMachine_GCC(StateMachine_Text):
         self.Inheritance()
         self.prefix = 'FSM_'
         self.prefix = ''
+        self.code_default = ['    return NULL;']
 
     def mkFunc(self, name=None):
         if name:
@@ -249,11 +250,12 @@ class StateMachine_GCC(StateMachine_Text):
             txt += ['{']
             txt += ['    %s smi;' % self.mkName()]
             txt += ['    %s_PRIVATE_DATA private_data;' % self.mkName()]
+            txt += ['    %s initialState = NULL;' % self.mkState('')]
             txt += ['']
             txt += ['    %s();' % self.mkFunc('ClassInit')]
             txt += ['    memset(&private_data, 0, sizeof(private_data));']
             txt += ['    smi = make(']
-            txt += ['        "test", %s,' % self.mkState('')]
+            txt += ['        "test", initialState,']
             txt += ['        &private_data, NULL);']
             txt += ['    %s(smi,' % self.mkFunc('SetReportFunc')]
             txt += ['        NULL);']

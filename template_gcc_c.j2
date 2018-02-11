@@ -1,0 +1,430 @@
+{%- set SM = statemachine|upper -%}
+{% include 'template_gcc_h.j2' %}
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#define {{SM}}_NUM_STATES {{states|count}}
+#define {{SM}}_NUM_EVENTS {{events|count}}
+#define {{SM}}_NUM_ACTIONS {{actions|count}}
+
+/* Actions */
+struct {{SM}}_ACTION_t {
+    int index;
+    char *name;
+};
+enum {
+{%- for action in actions|sort(case_sensitive=True) %}
+    e{{SM}}_ACTION_{{action}} = {{loop.index}},
+{%- endfor %}
+};
+
+{%- for action in actions|sort(case_sensitive=True) %}
+static const struct {{SM}}_ACTION_t s{{SM}}_ACTION_{{action}} = {e{{SM}}_ACTION_{{action}}, "{{action}}"};
+{%- endfor %}
+{%- for action in actions|sort(case_sensitive=True) %}
+const {{SM}}_ACTION {{SM}}_ACTION_{{action}} = &s{{SM}}_ACTION_{{action}};
+{%- endfor %}
+static const struct {{SM}}_ACTION_t *{{SM}}_ACTION_table[] = {
+    NULL,
+{%- for action in actions|sort(case_sensitive=True) %}
+    &s{{SM}}_ACTION_{{action}},
+{%- endfor %}
+};
+/* Events */
+struct {{SM}}_EVENT_t {
+    int index;
+    char *name;
+};
+enum {
+{%- for event in events|sort(case_sensitive=True) %}
+    e{{SM}}_EVENT_{{event}} = {{loop.index}},
+{%- endfor %}
+};
+{%- for event in events|sort(case_sensitive=True) %}
+static const struct {{SM}}_EVENT_t s{{SM}}_EVENT_{{event}} = {e{{SM}}_EVENT_{{event}}, "{{event}}"};
+{%- endfor %}
+{%- for event in events|sort(case_sensitive=True) %}
+const {{SM}}_EVENT {{SM}}_EVENT_{{event}} = &s{{SM}}_EVENT_{{event}};
+{%- endfor %}
+static const struct {{SM}}_EVENT_t * const {{SM}}_EVENT_table[] = {
+    NULL,
+{%- for event in events|sort(case_sensitive=True) %}
+    &s{{SM}}_EVENT_{{event}},
+{%- endfor %}
+};
+/* States */
+enum {
+{%- for state in states|sort(case_sensitive=True) %}
+    e{{SM}}_STATE_{{state}} = {{loop.index}},
+{%- endfor %}
+};
+/* Transition Table Structures */
+typedef enum {
+    fsmActionClass = 1, /* Classifier Action Entry */
+    fsmActionTrans = 2  /* Transition Action Entry */
+} fsmActionType;
+typedef struct fsmTransTab_t {
+    int inState;  /* Input State */
+    int inEvent;  /* Input Event */
+    fsmActionType ac_type; /* Classifier or Transition */
+    int ac_code;  /* Classifier Func or Output State */
+    int ac_list[];    /* Output Events or Action Funcs */
+} fsmTransTab;
+/* Transition Table Entries */
+{%- for state in transactions|sort(case_sensitive=True) %}
+{%- for event in transactions[state]|sort(case_sensitive=True) %}
+const static fsmTransTab {{SM}}_TRANS_{{state}}_{{event}} = {
+    .inState=e{{SM}}_STATE_{{state}},
+    .inEvent=e{{SM}}_EVENT_{{event}},
+{%- if transactions[state][event].type == "transition"%}
+    .ac_type=fsmActionTrans,
+{%- if transactions[state][event].targets|count > 0 %}
+    .ac_code=e{{SM}}_STATE_{{transactions[state][event].targets|first}},
+{%- else %}
+    .ac_code=0,
+{%- endif %}
+    .ac_list= {
+{%- for action in transactions[state][event].actions %}
+        e{{SM}}_ACTION_{{ action }},
+{%- endfor %}
+        0}
+{%- else %}
+    .ac_type=fsmActionClass,
+{%- if transactions[state][event].actions|count > 0 %}
+    .ac_code=e{{SM}}_ACTION_{{transactions[state][event].actions|first}},
+{%- else %}
+    .ac_code=0,
+{%- endif %}
+    .ac_list= {
+      {%- for target in transactions[state][event].targets %}
+        e{{SM}}_EVENT_{{ target }},
+      {%- endfor %}
+        0}
+{%- endif %}
+};
+{%- endfor %}
+{%- endfor %}
+
+/* State Data */
+struct {{SM}}_STATE_t {
+    int index;
+    const char *name;
+    const fsmTransTab *transTab[];
+};
+{%- for state in states|sort(case_sensitive=True) %}
+static struct {{SM}}_STATE_t const s{{SM}}_STATE_{{state}} = {
+    .index=e{{SM}}_STATE_{{state}},
+    .name="{{state}}",
+    .transTab={
+                   NULL,
+{%- for event in events|sort(case_sensitive=True) %}
+{%- if transactions[state][event] is defined %}
+        &{{SM}}_TRANS_{{state}}_{{event}},
+{%- else %}
+        NULL, /* {{SM}}_TRANS_{{state}}_{{event}} */
+{%- endif %}
+{%- endfor %}
+   }
+};
+{%- endfor %}
+{% for state in states|sort(case_sensitive=True) %}
+const {{SM}}_STATE {{SM}}_STATE_{{state}} = &s{{SM}}_STATE_{{state}};
+{%- endfor %}
+static struct {{SM}}_STATE_t const * const {{SM}}_STATE_table[] = {
+    NULL,
+{%- for state in states|sort(case_sensitive=True) %}
+    &s{{SM}}_STATE_{{state}},
+{%- endfor %}
+    NULL
+};
+static {{SM}}_Action action_funcs[{{SM}}_NUM_ACTIONS+1];
+
+/* State Machine Class */
+typedef struct fsmStateMachine_t fsmStateMachine;
+struct fsmStateMachine_t {
+    char *name;
+    int numStates;
+    int numEvents;
+    int numActions;
+    const {{SM}}_STATE *stateTable;
+    const {{SM}}_EVENT *eventTable;
+    const {{SM}}_ACTION *actionTable;
+    {{SM}}_EVENT entryEvent;
+    {{SM}}_EVENT exitEvent;
+    {{SM}}_Action *actionTab; /* Class Actions */
+};
+
+/* Event Queue Entry */
+typedef struct EventQueueEntry_t {
+    struct EventQueueEntry_t *next;
+    {{SM}}_EVENT ev;
+    void *pContext;
+} *pQueueEntry;
+
+/* State Machine Instance */
+struct {{SM}}_t {
+    char *name;
+    const fsmStateMachine *fsm;
+    {{SM}}_Action *actionTab; /* Instance Actions */
+    {{SM}}_STATE currentState;
+    void (*reportFunc)({{SM}} smi, const char *fmt, ...);
+    void *pPrivate; /* private */
+    void (*pKiller)(void*);
+    struct {
+        pQueueEntry pHead;
+        pQueueEntry pTail;
+        int iLength;
+    } EventQueue, EmptyQueue;
+};
+
+/* State Machine Initializer */
+static const fsmStateMachine fsm_{{SM|lower}} = {
+    .name="{{SM|lower}}",
+    .numStates={{SM}}_NUM_STATES,
+    .numEvents={{SM}}_NUM_EVENTS,
+    .numActions={{SM}}_NUM_ACTIONS,
+    .stateTable={{SM}}_STATE_table,
+    .eventTable={{SM}}_EVENT_table,
+    .actionTable={{SM}}_ACTION_table,
+    .entryEvent=&s{{SM}}_EVENT_Entry,
+    .exitEvent=&s{{SM}}_EVENT_Exit,
+    .actionTab=action_funcs
+};
+
+/* Create an Instance of this Statemachine */
+{{SM}} {{SM}}_InstanceMake(const char *name, {{SM}}_STATE initial)
+{
+    {{SM}} smi = ({{SM}}) calloc(1, sizeof(struct {{SM}}_t));
+    if (smi == NULL)
+        return NULL;
+    /* TODO initialisation */
+    if (action_funcs[0] == NULL)
+        {{SM}}_ClassInit();
+    smi->name = strdup(name);
+    smi->fsm = &fsm_{{SM|lower}};
+    smi->currentState = initial;
+    return smi;
+}
+
+/* Destroy an Instance of this Statemachine */
+void {{SM}}_InstanceKill({{SM}} smi)
+{
+    if (smi == NULL)
+        return;
+    free(smi->name);
+    if (smi->actionTab)
+        free(smi->actionTab);
+    if (smi->pPrivate && smi->pKiller)
+        (*smi->pKiller)(smi->pPrivate);
+    while (smi->EmptyQueue.pHead) {
+        pQueueEntry entry;
+        entry = smi->EmptyQueue.pHead;
+        smi->EmptyQueue.pHead = smi->EmptyQueue.pHead->next;
+        free(entry);
+    }
+    free(smi);
+}
+
+/* Run one Event for this Instance of this Statemachine */
+static {{SM}}_STATE {{SM}}_RunStateEvent(
+    {{SM}} smi,
+    {{SM}}_EVENT ev,
+    void *pContext)
+{
+    int i, j, k;
+    int nTrans=0, nActns=0;
+    {{SM}}_EVENT next_event = NULL;
+    {{SM}}_STATE next_state = smi->currentState;
+    const fsmStateMachine *fsm = smi->fsm;
+    const fsmTransTab *tab = NULL;
+    do {
+        next_event = NULL;
+        if (ev == NULL) {
+            return next_state;
+        }
+        tab = next_state->transTab[ev->index];
+        if (tab) {
+            fsmActionType actionType = tab->ac_type;
+            {{SM}}_Action fn;
+            ++nTrans;
+            switch (actionType) {
+                case fsmActionClass:
+                    k = tab->ac_code;
+                    fn = fsm->actionTab[k];
+                    if (smi->actionTab && smi->actionTab[k])
+                        fn = smi->actionTab[k];
+                    if (smi->reportFunc)
+                        (*smi->reportFunc)(smi,
+                            "%s(%s) -> %s",
+                            smi->currentState->name,
+                            ev->name,
+                            fsm->actionTable[k]->name);
+                    next_event = (*fn)(smi, smi->currentState, ev, pContext, smi->pPrivate);
+                    ev = next_event;
+                    break;
+                case fsmActionTrans:
+                    if (tab->ac_code)
+                        next_state = fsm->stateTable[tab->ac_code];
+                    nActns = 0;
+                    for (j = 0; tab->ac_list[j]; ++ j) {
+                        ++nActns;
+                        k = tab->ac_list[j];
+                        fn = fsm->actionTab[k];
+                        if (smi->actionTab && smi->actionTab[k])
+                            fn = smi->actionTab[k];
+                        if (smi->reportFunc)
+                            (*smi->reportFunc)(smi,
+                                "%s(%s) [%s]",
+                                smi->currentState->name,
+                                ev->name,
+                                fsm->actionTable[k]->name);
+                        (void) (*fn)(smi, smi->currentState, ev, pContext, smi->pPrivate);
+                    }
+                    if (nActns == 0) /* no actions reported */
+                        if (smi->reportFunc)
+                            (*smi->reportFunc)(smi,
+                                "%s(%s) [<no actions>]",
+                                smi->currentState->name,
+                                ev->name);
+                    break;
+            }
+        }
+        if (nTrans == 0) /* event not handled */
+            if (smi->reportFunc)
+                (*smi->reportFunc)(smi,
+                    "%s(%s) [<unhandled>]",
+                    smi->currentState->name,
+                    ev->name);
+    } while (next_event);
+    return next_state;
+}
+
+void {{SM}}_InstanceRun({{SM}} smi, {{SM}}_EVENT ev, void *pContext)
+{
+    pQueueEntry event;
+    if (smi->EmptyQueue.pHead) {
+        event = smi->EmptyQueue.pHead;
+        --smi->EmptyQueue.iLength;
+        smi->EmptyQueue.pHead = event->next;
+        if (smi->EmptyQueue.pHead == NULL)
+            smi->EmptyQueue.pTail = NULL;
+        else
+            event->next = NULL;
+    } else {
+        event = calloc(1, sizeof(struct EventQueueEntry_t));
+        /* TODO: check return */
+        if (smi->reportFunc)
+            (*smi->reportFunc)(smi,
+                "new event queue entry in %s(%s)",
+                smi->currentState->name,
+                ev->name);
+    }
+    event->ev = ev;
+    event->pContext = pContext;
+    /* the current event is always on the queue */
+    /* if queue is busy, we must have recursed */
+    if (smi->EventQueue.pHead) {
+       /* push this event on the tail and return */
+        smi->EventQueue.pTail->next = event;
+        smi->EventQueue.pTail = event;
+        ++smi->EventQueue.iLength;
+        if (smi->reportFunc)
+            (*smi->reportFunc)(smi,
+                "recursive event in %s(%s) is %s",
+                smi->currentState->name,
+                smi->EventQueue.pHead->ev->name,
+                ev->name);
+        return;
+    } else {
+       /* push this event on the queue and continue */
+        smi->EventQueue.pHead = smi->EventQueue.pTail = event;
+        ++smi->EventQueue.iLength;
+    }
+    while (event) {
+        ev = event->ev;
+        pContext = event->pContext;
+        {{SM}}_STATE next_state = {{SM}}_RunStateEvent(smi, ev, pContext);
+        while (next_state != smi->currentState) {
+            if (smi->fsm->exitEvent)
+                {{SM}}_RunStateEvent(smi, smi->fsm->exitEvent, pContext);
+            if (smi->reportFunc)
+                (*smi->reportFunc)(smi,
+                    "%s ==> %s",
+                    smi->currentState->name,
+                    next_state->name);
+            smi->currentState = next_state;
+            if (smi->fsm->entryEvent)
+                next_state = {{SM}}_RunStateEvent(smi, smi->fsm->entryEvent, pContext);
+        }
+        /* push current event onto empty queue */
+        if (smi->EmptyQueue.pHead) {
+            smi->EmptyQueue.pTail->next = event;
+            smi->EmptyQueue.pTail = event;
+            return;
+        } else {
+            smi->EmptyQueue.pHead = smi->EmptyQueue.pTail = event;
+        }
+        ++smi->EmptyQueue.iLength;
+        /* pop the current event off the event queue */
+        --smi->EventQueue.iLength;
+        smi->EventQueue.pHead = event->next;
+        if (smi->EventQueue.pHead == NULL)
+            smi->EventQueue.pTail = NULL;
+        /* new event is on the head of the queue */
+        event = smi->EventQueue.pHead;
+    }
+}
+
+void {{SM}}_ClassSetAction(
+        {{SM}}_ACTION action,
+        {{SM}}_Action func)
+{
+    if (action->index > 0 && action->index <= {{SM}}_NUM_ACTIONS)
+        action_funcs[action->index] = func;
+}
+
+void {{SM}}_InstanceSetAction(
+        {{SM}} smi,
+        {{SM}}_ACTION action,
+        {{SM}}_Action func)
+{
+    if (action->index > 0 && action->index <= {{SM}}_NUM_ACTIONS) {
+        if (smi->actionTab == NULL)
+            smi->actionTab = ({{SM}}_Action *) calloc({{SM}}_NUM_ACTIONS + 1, sizeof({{SM}}_Action));
+        smi->actionTab[action->index] = func;
+    }
+}
+
+/* Report Function accessors */
+void {{SM}}_SetReportFunc({{SM}} smi,
+    void (*reportFunc)({{SM}} smi, const char *fmt, ...))
+{
+    smi->reportFunc = reportFunc;
+}
+void (*{{SM}}_GetReportFunc({{SM}} smi))({{SM}} smi, const char *fmt, ...)
+{
+    return smi->reportFunc;
+}
+
+/* Private data accessors */
+void {{SM}}_SetPrivate({{SM}} smi, void *data, void (*pKiller)(void *))
+{
+    smi->pPrivate = data;
+    smi->pKiller = pKiller;
+}
+void *{{SM}}_GetPrivate({{SM}} smi)
+{
+    return smi->pPrivate;
+}
+const char *{{SM}}_GetName({{SM}} smi)
+{
+    return smi->name;
+}
+
+#ifdef UNIT_TEST
+#endif /* UNIT_TEST */
+
+/*
+ * vim: ft=c ts=8 sts=4 sw=4 et cindent fmr=[[[,]]]
+ */

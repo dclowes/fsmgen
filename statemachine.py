@@ -104,6 +104,7 @@ class StateMachine(object):
         self.outputs = []
         self.code_blocks = {}
         self.done_blocks = []
+        self.code_default = []
 
     def __repr__(self):
         text = "name = %s" % repr(self.name)
@@ -244,7 +245,18 @@ class StateMachine_Text(StateMachine):
             self.action_list = other.action_list[:]
             self.code_blocks = {}
             self.done_blocks = []
+            self.code_default = []
             return
+
+    def is_default(self, target):
+        if len(self.code_blocks[target]) == 0:
+            return True
+        if len(self.code_blocks[target]) != len(self.code_default):
+            return False
+        for i in range(len(self.code_default)):
+            if self.code_blocks[target][i] != self.code_default[i]:
+                return False
+        return True
 
     def Absorb_Skel(self, file_name):
         '''
@@ -263,14 +275,13 @@ class StateMachine_Text(StateMachine):
         except IOError:
             lines = []
         for line in lines:
-            if "BEGIN CUSTOM:" in line:
-                target = re.sub(r'.*BEGIN CUSTOM: (.*) {.*', r'\1', line)
+            if " BEGIN CUSTOM: " in line:
+                target = re.sub(r'.*BEGIN CUSTOM: ([ _a-zA-Z0-9]+) +[^ _a-zA-Z0-9].*', r'\1', line)
                 self.code_blocks[target] = []
                 continue
-            if "END CUSTOM:" in line:
-                if len(self.code_blocks[target]) == 1:
-                    if self.code_blocks[target][0] == "    return NULL;":
-                        del self.code_blocks[target]
+            if " END CUSTOM: " in line:
+                if self.is_default(target):
+                    del self.code_blocks[target]
                 target = None
                 continue
             if target:

@@ -184,29 +184,50 @@ t_SLASH = r'/'
 t_COMMA = r','
 t_COLON = r':'
 
-def t_AT_C(t):
-    r'@C'
-    if Verbose:
-        print 'AT_C'
+def t_AT_CODE(t):
+    r'@(CODE=)?[A-Za-z0-9_]+'
+    if t.value.startswith('@CODE='):
+        lang = t.value[6:].upper()
+    else:
+        lang = t.value[1:].upper()
+    if lang in ['GCC', 'C']:
+        t.type = 'AT_C'
+        t.value = '@C'
+    elif lang in ['PYTHON']:
+        t.type = 'AT_PYTHON'
+        t.value = '@PYTHON'
+    elif lang in ['TCL']:
+        t.type = 'AT_TCL'
+        t.value = '@TCL'
+    else:
+        message = "Illegal code language '%s'" % t.value
+        PrintParseError(message)
     t.lexer.begin('tcl')
-    t.value = "@C"
     return t
 
-def t_AT_PYTHON(t):
-    r'@PYTHON'
-    if Verbose:
-        print 'AT_PYTHON'
-    t.lexer.begin('tcl')
-    t.value = "@PYTHON"
-    return t
-
-def t_AT_TCL(t):
-    r'@TCL'
-    if Verbose:
-        print 'AT_TCL'
-    t.lexer.begin('tcl')
-    t.value = "@TCL"
-    return t
+#def t_AT_C(t):
+#    r'@(GC)?C'
+#    if Verbose:
+#        print 'AT_C'
+#    t.lexer.begin('tcl')
+#    t.value = "@C"
+#    return t
+#
+#def t_AT_PYTHON(t):
+#    r'@PYTHON'
+#    if Verbose:
+#        print 'AT_PYTHON'
+#    t.lexer.begin('tcl')
+#    t.value = "@PYTHON"
+#    return t
+#
+#def t_AT_TCL(t):
+#    r'@TCL'
+#    if Verbose:
+#        print 'AT_TCL'
+#    t.lexer.begin('tcl')
+#    t.value = "@TCL"
+#    return t
 
 def t_tcl_AT_END(t):
     r'[ \t]*@END'
@@ -686,6 +707,9 @@ def generate_source(the_fsm, SourceData, source_file):
     from generate_html import StateMachine_HTML
     from generate_sql import StateMachine_SQL
     from generate_uml import StateMachine_UML
+    from generate_yml import StateMachine_YML
+    import json
+    import yaml
 
     dest_file = os.path.join(os.path.dirname(source_file),\
                              the_fsm.name + ".fsm")
@@ -716,6 +740,27 @@ def generate_source(the_fsm, SourceData, source_file):
     uml_cmd = "plantuml %s.uml" % dest_file
     print uml_cmd
     os.system(uml_cmd)
+
+    #
+    # Generate the YML
+    #
+    fsm_yml = StateMachine_YML(the_fsm)
+    if 'GCC' in the_fsm.outputs:
+        fsm_yml.Load('GCC')
+    if 'TCL' in the_fsm.outputs:
+        fsm_yml.Load('TCL')
+    the_dict = fsm_yml.Dictify()
+    with open("%s.yml" % dest_file, "w") as fdo:
+        fdo.write('\n'.join(fsm_yml.Generate()))
+    with open("%s.YML" % dest_file, "w") as fdo:
+        fdo.write(yaml.dump(fsm_yml, indent=2))
+    with open("%s_xxx.yml" % dest_file, "w") as fdo:
+        fdo.write(yaml.dump(the_dict, indent=2))
+    with open("%s_xxx.json" % dest_file, "w") as fdo:
+        fdo.write(json.dumps(the_dict, indent=2))
+    yml_cmd = "jinja2 $template_file.j2 %s.yml" % dest_file
+    print yml_cmd
+    #os.system(uml_cmd)
 
     #
     # Generate the Graphviz
@@ -820,6 +865,8 @@ def generate_source(the_fsm, SourceData, source_file):
             fdo.write('\n')
         gcc_cmd = 'gcc -DUNIT_TEST %s.c' % (dest_file)
         print gcc_cmd
+        with open('%s.skel.yml' % dest_file, 'w') as fdo:
+            fdo.write(yaml.dump(fsm_gcc3, indent=2))
 
 def main():
     global lexer, yaccer

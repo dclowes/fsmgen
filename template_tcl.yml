@@ -1,0 +1,11 @@
+---
+template:
+  files:
+    - file: "TCL fsm script"
+      input: template_tcl.j2
+      output: "{{dest_file}}2.tcl"
+    - file: "TCL action code"
+      input: template_tcl_code.j2
+      preload: "{{dest_file}}.code.tcl"
+      output: "{{dest_file}}2.code.tcl"
+

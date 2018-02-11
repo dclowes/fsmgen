@@ -1,0 +1,13 @@
+---
+template:
+  files:
+    - file: "Header file"
+      input: template_gcc_h.j2
+      output: "{{dest_file}}.hX"
+    - file: "Code file"
+      input: template_gcc_c.j2
+      output: "{{dest_file}}.cX"
+    - file: "Action file"
+      input: template_gcc_a.j2
+      preload: "{{dest_file}}.skel.c"
+      output: "{{dest_file}}.skel.cX"
