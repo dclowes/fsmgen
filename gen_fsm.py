@@ -751,6 +751,7 @@ def generate_source(the_fsm, SourceData, source_file):
     with open("%s.json" % dest_file, "w") as fdo:
         fdo.write(json.dumps(the_dict, indent=4))
     fsm_yml.Load('FSM')
+    fsm_yml.Load('PYTHON')
     if 'GCC' in the_fsm.outputs:
         fsm_yml.Load('GCC')
     if 'TCL' in the_fsm.outputs:

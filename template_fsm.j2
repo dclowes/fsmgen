@@ -5,11 +5,11 @@ STATEMACHINE {{statemachine|lower}} {
   STATES
 {%- for state in states|sort(case_sensitive=True) %}
     {{state}}
-    {%- if comment in states[state] %}
-      {%- if states[state][comment]|count == 1 %}
-        "{{states[state][comment]|first}}"
+  {%- if 'flags' in states[state] %}({{states[state]['flags']|join(',')}}){%endif%}
+    {%- if 'comment' in states[state] %}
+      {%- if states[state]['comment']|count == 1 %} "{{states[state]['comment']|first}}"
       {%- else %}
-        {%- for comment in states[state][comment] %}
+        {%- for comment in states[state]['comment'] %}
           "{{comment}}"
         {%- endfor %}
       {%- endif %}
@@ -20,11 +20,10 @@ STATEMACHINE {{statemachine|lower}} {
   EVENTS
 {%- for event in events|sort(case_sensitive=True) %}
     {{event}}
-  {%- if comment in events[event] %}
-    {%- if events[event][comment]|count == 1 %}
-      "{{events[event][comment]|first}}"
+  {%- if 'comment' in events[event] %}
+    {%- if events[event]['comment']|count == 1 %} "{{events[event]['comment']|first}}"
     {%- else %}
-      {%- for comment in events[event][comment] %}
+      {%- for comment in events[event]['comment'] %}
         "{{comment}}"
       {%- endfor %}
     {%- endif %}

@@ -1,0 +1,7 @@
+---
+template:
+  files:
+    - file: "Output PYTHON"
+      input: template_python.j2
+      output: "{{dest_file}}2.py"
+
