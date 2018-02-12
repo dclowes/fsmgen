@@ -745,21 +745,16 @@ def generate_source(the_fsm, SourceData, source_file):
     # Generate the YML
     #
     fsm_yml = StateMachine_YML(the_fsm)
+    the_dict = fsm_yml.Dictify()
+    with open("%s.yml" % dest_file, "w") as fdo:
+        fdo.write(yaml.dump(the_dict, indent=4))
+    with open("%s.json" % dest_file, "w") as fdo:
+        fdo.write(json.dumps(the_dict, indent=4))
+    fsm_yml.Load('FSM')
     if 'GCC' in the_fsm.outputs:
         fsm_yml.Load('GCC')
     if 'TCL' in the_fsm.outputs:
         fsm_yml.Load('TCL')
-    the_dict = fsm_yml.Dictify()
-    with open("%s.yml" % dest_file, "w") as fdo:
-        fdo.write('\n'.join(fsm_yml.Generate()))
-    with open("%s.YML" % dest_file, "w") as fdo:
-        fdo.write(yaml.dump(fsm_yml, indent=2))
-    with open("%s_xxx.yml" % dest_file, "w") as fdo:
-        fdo.write(yaml.dump(the_dict, indent=2))
-    with open("%s_xxx.json" % dest_file, "w") as fdo:
-        fdo.write(json.dumps(the_dict, indent=2))
-    yml_cmd = "jinja2 $template_file.j2 %s.yml" % dest_file
-    print yml_cmd
     #os.system(uml_cmd)
 
     #

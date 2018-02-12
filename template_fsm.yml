@@ -1,0 +1,7 @@
+---
+template:
+  files:
+    - file: "Output FSM"
+      input: template_fsm.j2
+      output: "{{dest_file}}.FSM.txt"
+

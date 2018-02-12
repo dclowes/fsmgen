@@ -2,35 +2,40 @@
 class statemachine
 statemachine : text name
 statemachine : text[] comments
-class fsm_state
-fsm_state : text name
-fsm_state : text[] bases
-fsm_state : text[] flags
-fsm_state : text[] comments
-class fsm_event
-fsm_event : text name
-fsm_event : text[] comments
-class fsm_transaction
-fsm_transaction : text name
-fsm_transaction : text[] comments
-fsm_transaction : text next_state
-fsm_transaction : text this_state
-fsm_transaction : text event
-fsm_transaction : text[] actions
-class fsm_action
-fsm_action : text name
-fsm_action : text[] comments
-class fsm_code
-fsm_code : text name
-fsm_code : text type
-fsm_code : text[] lines
-statemachine "1" o-- "many" fsm_transaction : has
-fsm_transaction "1" -- "1" fsm_state : from
-fsm_transaction "1" -- "0..1" fsm_state : to
-fsm_transaction "1" -- "1" fsm_event : on
-fsm_transaction "1" o-- "many" fsm_action : invoke
-fsm_action "1" *-- "many" fsm_code : as
+class state
+state : text name
+state : text[] bases
+state : text[] flags
+state : text[] comments
+class event
+event : text name
+event : text[] comments
+class transaction
+transaction : text name
+transaction : text[] comments
+transaction : text next_state
+transaction : text this_state
+transaction : text event
+transaction : text[] actions
+class action
+action : text name
+action : text[] comments
+action : text[] events
+class code
+code : text name
+code : text type
+code : text[] lines
+class invocation
+invocation : text action
+invocation : text[] events
+statemachine "1" o-- "many" transaction : has
+transaction "1" -- "1" state : from
+transaction "1" -- "0..1" state : to
+transaction "1" -- "1" event : on
+transaction "1" o-- "many" invocation : invoke
+invocation "*" o-- "1" action
+action "1" *-- "many" code : as
 'event --> classification
-'fsm_state --> transaction
+'state --> transaction
 'event --> transaction
 @enduml

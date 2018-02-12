@@ -384,8 +384,8 @@ class StateMachine_Text(StateMachine):
                 txt += ['  State %s (%s) {' % (state, ', '.join(s.base_list))]
             else:
                 txt += ['  State %s {' % state]
-            the_blocks = [b for b in self.classifiers if b.source == state]
-            the_blocks += [b for b in self.transitions if b.source == state]
+                the_blocks = [b for b in sorted(self.classifiers, key = lambda x: x.event) if b.source == state]
+            the_blocks += [b for b in sorted(self.transitions, key = lambda x: x.event) if b.source == state]
             for block in the_blocks:
                 line = '%s' % block.event
                 if isinstance(block, Classifier):

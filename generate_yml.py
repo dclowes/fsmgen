@@ -55,9 +55,17 @@ class StateMachine_YML(StateMachine_Text):
 
 
     def Dictify(self):
-        result = {'statemachine': self.uname, 'dest_file': self.dest_file}
+        '''
+        Produce a python dictionary version of the statemachine description
+        '''
+        result = {
+            'statemachine': self.uname,
+            'dest_file': self.dest_file
+        }
 
+        # enumerate the states
         the_states = {}
+        initial_states = []
         for state in self.states:
             the_states[state.name] = state
         result['states'] = {}
@@ -67,10 +75,17 @@ class StateMachine_YML(StateMachine_Text):
                 this_state['comment'] = the_states[state].comments
             if the_states[state].flags:
                 this_state['flags'] = the_states[state].flags
+                for flag in this_state['flags']:
+                    if flag.upper() == 'INITIAL':
+                        if not state in initial_states:
+                            initial_states.append(state)
             if the_states[state].base_list:
                 this_state['inherits'] = the_states[state].base_list
             result['states'][state] = this_state
+        if initial_states:
+            result['initial_states'] = initial_states
 
+        # enumerate the events
         the_events = {}
         for event in self.events:
             the_events[event.name] = event
@@ -81,7 +96,9 @@ class StateMachine_YML(StateMachine_Text):
                 this_event['comment'] = the_events[event].comments
             result['events'][event] = this_event
 
+        # enumerate the actions
         the_actions = {}
+        print("Actions:%s"%yaml.dump(self.actions))
         for action in self.actions:
             the_actions[action.name] = action
         result['actions'] = {}
@@ -89,8 +106,11 @@ class StateMachine_YML(StateMachine_Text):
             this_action = {}
             if the_actions[action].comments:
                 this_action['comment'] = the_actions[action].comments
+            if the_actions[action].code_text:
+                this_action['code_text'] = the_actions[action].code_text
             result['actions'][action] = this_action
 
+        # enumerate the transactions
         transactions = {}
         for state in sorted(the_states):
             this_state = {}
@@ -114,6 +134,16 @@ class StateMachine_YML(StateMachine_Text):
                     this_state[event] = this_one
             transactions[state] = this_state
         result['transactions'] = transactions
+
+        # enumerate the tests
+        tests = []
+        for test in self.tests:
+            #print "Test:", test.tests
+            tests.append(test.tests)
+        result['tests'] = tests
+
+        if self.outputs:
+            result['outputs'] = self.outputs
 
         #print(result)
         #print(yaml.dump(result))

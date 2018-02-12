@@ -1,0 +1,109 @@
+STATEMACHINE {{statemachine|lower}} {
+{%- if outputs is defined %}
+  OUTPUT {{ outputs|join(', ') }};
+{%- endif %}
+  STATES
+{%- for state in states|sort(case_sensitive=True) %}
+    {{state}}
+    {%- if comment in states[state] %}
+      {%- if states[state][comment]|count == 1 %}
+        "{{states[state][comment]|first}}"
+      {%- else %}
+        {%- for comment in states[state][comment] %}
+          "{{comment}}"
+        {%- endfor %}
+      {%- endif %}
+    {%- else %} "No Comment"
+    {%- endif %}
+  {%- if loop.last %};{%- else %},{%- endif %}
+{%- endfor %}
+  EVENTS
+{%- for event in events|sort(case_sensitive=True) %}
+    {{event}}
+  {%- if comment in events[event] %}
+    {%- if events[event][comment]|count == 1 %}
+      "{{events[event][comment]|first}}"
+    {%- else %}
+      {%- for comment in events[event][comment] %}
+        "{{comment}}"
+      {%- endfor %}
+    {%- endif %}
+  {%- else %} "No Comment"
+  {%- endif %}
+{%- if loop.last %};{%- else %},{%- endif %}
+{%- endfor %}
+  ACTIONS
+{%- for action in actions|sort(case_sensitive=True) %}
+    {{action}}
+  {%- if actions[action]['comment'] is defined %}
+    {%- if actions[action]['comment']|count == 1 %} "{{actions[action]['comment']|first}}"
+    {%- else %}
+      {%- for comment in actions[action]['comment'] %}
+        "{{comment}}"
+      {%- endfor %}
+    {%- endif %}
+  {%- else %} "No Comment"
+  {%- endif %}
+{%- if loop.last %};{%- else %},{%- endif %}
+{%- endfor %}
+
+{%- set NL='' %}
+{%- for state in states|sort(case_sensitive=True) %}
+  {%- if transactions[state] is defined %}
+
+  State {{state}} {
+    {%- for event in events|sort(case_sensitive=True) %}
+      {%- if transactions[state][event] is defined %}
+        {%- if transactions[state][event]['type'] == 'classifier' %}
+    {{ event }}
+          {%- if transactions[state][event]['actions'] is defined -%}
+            {{NL}} -> {{ transactions[state][event]['actions']|join(', ') }}
+          {%- endif -%}
+          {{NL}} --> {{ transactions[state][event]['targets']|join(', ') }};
+        {%- endif %}
+      {%- endif %}
+    {%- endfor %}
+    {%- for event in events|sort(case_sensitive=True) %}
+      {%- if transactions[state][event] is defined %}
+        {%- if transactions[state][event]['type'] == 'transition' %}
+    {{ event }}
+          {%- if transactions[state][event]['actions'] is defined -%}
+            {{NL}} -> {{ transactions[state][event]['actions']|join(', ') }}
+          {%- endif -%}
+          {%- if transactions[state][event]['targets']|count > 0 -%}
+            {{NL}} => {{ transactions[state][event]['targets']|join(', ') }}
+          {%- endif %};
+        {%- endif %}
+      {%- endif %}
+    {%- endfor %}
+  }
+  {%- endif %}
+{%- endfor %}
+
+{%- for action in actions|sort %}
+  {%- if actions[action]['code_text'] is defined %}
+
+  CODE {{action}} {
+  {%- for lang in actions[action]['code_text']|sort %}
+    @{{lang}}
+    {%- for line in actions[action]['code_text'][lang] %}
+{{line}}
+    {%- endfor %}
+    @END
+  {%- endfor %}
+  }
+  {%- endif %}
+{%- endfor %}
+
+{%- if tests is defined %}
+{%- for test in tests %}
+
+  Test
+  {%- for item in test %}
+{%- if loop.first %} {{item}}{% else %}
+    {{item}}{%- endif %}
+{%- if loop.last %};{% else %},{%- endif %}
+{%- endfor %}
+{%- endfor %}
+{%- endif %}
+}
