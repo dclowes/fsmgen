@@ -750,6 +750,7 @@ def generate_source(the_fsm, SourceData, source_file):
         fdo.write(yaml.dump(the_dict, indent=4))
     with open("%s.json" % dest_file, "w") as fdo:
         fdo.write(json.dumps(the_dict, indent=4))
+    fsm_yml.Load('UML')
     fsm_yml.Load('FSM')
     fsm_yml.Load('PYTHON')
     if 'GCC' in the_fsm.outputs:

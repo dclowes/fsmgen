@@ -28,7 +28,7 @@ class StateMachine_UML(StateMachine_Text):
         txt += ['']
         for state in sorted(the_states):
             if doClassifiers: # Classifiers
-                the_blocks = [b for b in sorted(self.classifiers) if b.source == state]
+                the_blocks = [b for b in sorted(self.classifiers, key=lambda x:x.event) if b.source == state]
                 for block in the_blocks:
                     line = '%s --> %s : %s' %\
                             (state,
@@ -43,7 +43,7 @@ class StateMachine_UML(StateMachine_Text):
                                     (','.join(block.actions),
                                     ',\\n'.join(block.targets))
                     txt.append(line)
-            the_blocks = [b for b in sorted(self.transitions) if b.source == state]
+            the_blocks = [b for b in sorted(self.transitions, key=lambda x:x.event) if b.source == state]
             for block in the_blocks:
                 if len(block.targets) == 0:
                     tgts = state
