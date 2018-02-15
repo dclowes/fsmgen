@@ -27,8 +27,8 @@ def StateSwitch_{{sm}}(context, state, event):
     {%- endif %}
     {%- endfor %}
     {%- if transactions[state][event]['type'] == 'transition' %}
-    {%- if transactions[state][event]['targets'] is defined %}
-            next_state = "{{transactions[state][event]['targets']|first}}"
+    {%- if transactions[state][event]['states'] is defined %}
+            next_state = "{{transactions[state][event]['states']|first}}"
     {%- endif %}
     {%- endif %}
             return (next_state, next_event, 1)

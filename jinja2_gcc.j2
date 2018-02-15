@@ -144,7 +144,7 @@ const static fsmTransTab {{SM}}_TRANS_{{item.state}}_{{item.event}} = {
     .inEvent=e{{SM}}_EVENT_{{item.event}},
 {%- if item.type == "transition"%}
     .ac_type=fsmActionTrans,
-    .ac_code={%if item.targets|count > 0 %}e{{SM}}_STATE_{{item.targets|first}}{% else %}0{% endif %},
+    .ac_code={%if item.states|count > 0 %}e{{SM}}_STATE_{{item.states|first}}{% else %}0{% endif %},
     .ac_list= {
       {%- for action in item.actions %}
         e{{SM}}_ACTION_{{ action }},
@@ -154,7 +154,7 @@ const static fsmTransTab {{SM}}_TRANS_{{item.state}}_{{item.event}} = {
     .ac_type=fsmActionClass,
     .ac_code={%if item.actions|count > 0 %}e{{SM}}_ACTION_{{item.actions|first}}{% else %}0{% endif %},
     .ac_list= {
-      {%- for target in item.targets %}
+      {%- for target in item.events %}
         e{{SM}}_EVENT_{{ target }},
       {%- endfor %}
         0}

@@ -55,7 +55,7 @@ STATEMACHINE statemachine_name
   ACTIONS action_1["comment"][,...];
   STATE state_in
   {
-    event_in [-> action_1 [--> event_out_1[,...][,...] => state_out]];
+    event_in [-> action_1[, ...]] [--> event_out_1[,...]] [=> state_out];
     [...]
   }
   TEST state_1,event_1[,...],state_N;

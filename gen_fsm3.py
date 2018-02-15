@@ -15,9 +15,22 @@
 # pylint: disable=unused-argument
 #
 import os
-#import re
+import re
 import ply.lex as lex
 import ply.yacc as yacc
+
+ACTIONS = 'actions'
+CODE = 'Code'
+DEST = 'dest_file'
+COMMENTS = 'comment'
+EVENTS = 'events'
+FLAGS = 'flags'
+FILENAME = 'filename'
+NAME = 'statemachine'
+OUTPUTS = 'outputs'
+STATES = 'states'
+TESTS = 'tests'
+TRANSACTIONS = 'transactions'
 
 Statemachine = None
 lexer = None
@@ -49,7 +62,6 @@ reserved = {
 }
 
 def ReportP(p, locn):
-    return
     if Verbose:
         print(locn)
         if p:
@@ -73,7 +85,7 @@ tokens = [
     'TEXT_STRING2',
     'EQUALS',
     'ID',
-    'AT_C',
+    'AT_CODE',
     'AT_PYTHON',
     'AT_TCL',
     'AT_END',
@@ -102,20 +114,19 @@ def t_AT_CODE(t):
     else:
         lang = t.value[1:].upper()
     if lang in ['GCC', 'C']:
-        t.type = 'AT_C'
-        t.value = '@C'
+        t.type = 'AT_CODE'
+        t.value = lang
     elif lang in ['PYTHON']:
         t.type = 'AT_PYTHON'
-        t.value = '@PYTHON'
+        t.value = 'PYTHON'
     elif lang in ['TCL']:
         t.type = 'AT_TCL'
-        t.value = '@TCL'
+        t.value = 'TCL'
     else:
-        message = "Illegal code language '%s'" % t.value
-        PrintParseError(message)
+        t.type = 'AT_CODE'
+        t.value = lang
     t.lexer.begin('code')
     return t
-
 
 def t_code_AT_END(t):
     r'[ \t]*@END'
@@ -242,12 +253,11 @@ def p_fsm(p):
     p[0] = [{'Statemachine' : {p[2] : p[3]}}]
     if Verbose:
         print("Statemachine:"+ p[0])
-    Statemachine['Name'] = p[2]
+    Statemachine[NAME] = p[2]
 
 def p_fsm_block(p):
     '''
-    fsm_block : LBRACE fsm_statement_list RBRACE
-              | EQUALS LBRACE fsm_statement_list RBRACE
+    fsm_block : equal LBRACE fsm_statement_list RBRACE
     '''
     if len(p) > 4: # it has the EQUALS in there
         p[0] = p[3]
@@ -280,8 +290,8 @@ def p_output_list(p):
     '''
     p[0] = p[1]
     for outp in p[1]:
-        if outp.upper() not in Statemachine['Outputs']:
-            Statemachine['Outputs'].append(outp.upper())
+        if outp.upper() not in Statemachine[OUTPUTS]:
+            Statemachine[OUTPUTS].append(outp.upper())
 def p_state_list(p):
     '''
     state_list : state_type
@@ -299,16 +309,18 @@ def p_state_type(p):
                | state_type text_string
     '''
     p[0] = p[1]
-    if p[0] not in Statemachine['States']:
-        Statemachine['States'][p[0]] = {}
+    if p[0] not in Statemachine[STATES]:
+        Statemachine[STATES][p[0]] = {}
     if len(p) == 5:
-        if p[1] not in Statemachine['State_Flags']:
-            Statemachine['State_Flags'][p[1]] = []
-        Statemachine['State_Flags'][p[1]] += p[3]
+        # with flags
+        if FLAGS not in Statemachine[STATES][p[0]]:
+            Statemachine[STATES][p[0]][FLAGS] = []
+        Statemachine[STATES][p[0]][FLAGS] += p[3]
     if len(p) == 3:
-        if p[1] not in Statemachine['State_Comments']:
-            Statemachine['State_Comments'][p[1]] = []
-        Statemachine['State_Comments'][p[1]].append(p[2])
+        # with comment
+        if COMMENTS not in Statemachine[STATES][p[0]]:
+            Statemachine[STATES][p[0]][COMMENTS] = []
+        Statemachine[STATES][p[0]][COMMENTS] += [p[2]]
 
 def p_flag_list(p):
     '''
@@ -337,19 +349,15 @@ def p_event_type(p):
                | id_or_str LPAREN id_list RPAREN
                | event_type text_string
     '''
-    if len(p) == 2:
-        if p[1] not in Statemachine['Events']:
-            Statemachine['Events'][p[1]] = {}
-        p[0] = [p[1], []]
-    elif len(p) == 5:
-        if p[1] not in Statemachine['Events']:
-            Statemachine['Events'][p[1]] = {}
-        p[0] = [p[1], p[3]]
-    elif len(p) == 3:
-        p[0] = p[1]
-        if 'Comment' not in Statemachine['Events'][p[0][0]]:
-            Statemachine['Events'][p[0][0]]['Comment'] = []
-        Statemachine['Event_Comments'][p[0][0]]['Comment'].append(p[2])
+    p[0] = p[1]
+    if p[0] not in Statemachine[EVENTS]:
+        Statemachine[EVENTS][p[0]] = {}
+    if len(p) == 5:
+        pass # TODO list
+    if len(p) == 3:
+        if COMMENTS not in Statemachine[EVENTS][p[0]]:
+            Statemachine[EVENTS][p[0]][COMMENTS] = []
+        Statemachine[EVENTS][p[0]][COMMENTS] += [p[2]]
 
 def p_action_list(p):
     '''
@@ -365,33 +373,56 @@ def p_action_list(p):
 def p_action_type(p):
     '''
     action_type : id_or_str
+                | id_or_str LPAREN event_list RPAREN
                 | action_type text_string
     '''
     p[0] = p[1]
-    if len(p) == 2:
-        if p[0] not in Statemachine['Actions']:
-            Statemachine['Actions'][p[0]] = {}
+    if p[0] not in Statemachine[ACTIONS]:
+        Statemachine[ACTIONS][p[0]] = {}
     if len(p) == 3:
-        if 'Comment' not in Statemachine['Actions']:
-            Statemachine['Actions'][p[0]]['Comment'] = []
-        Statemachine['Action_Comments'][p[0]]['Comment'].append(p[2])
+        # with comment
+        if COMMENTS not in Statemachine[ACTIONS][p[0]]:
+            Statemachine[ACTIONS][p[0]][COMMENTS] = []
+        Statemachine[ACTIONS][p[0]][COMMENTS] += [p[2]]
+    if len(p) == 5:
+        # with events
+        if EVENTS not in Statemachine[ACTIONS][p[0]]:
+            Statemachine[ACTIONS][p[0]][EVENTS] = []
+        Statemachine[ACTIONS][p[0]][EVENTS] += [p[3]]
+
 
 def p_state_block(p):
     '''
     state_block : id_or_str LBRACE state_code_list RBRACE
-                | id_or_str EQUALS LBRACE state_code_list RBRACE
+                | id_or_str equal LBRACE state_code_list RBRACE
                 | id_or_str LPAREN state_list RPAREN LBRACE state_code_list RBRACE
     '''
     ReportP(p, "state_block")
-    if len(p) == 5: # simple
-        Statemachine['Transactions'][p[1]] = p[3]
-        p[0] = [p[1]] + p[3]
-    elif len(p) == 6: # it has the EQUALS in there
-        Statemachine['Transactions'][p[1]] = p[4]
-        p[0] = [p[1]] + p[4]
+    seq = []
+    state = p[1]
+    if state not in Statemachine[STATES]:
+        Statemachine[STATES][state] = {}
+    if state not in Statemachine[TRANSACTIONS]:
+        Statemachine[TRANSACTIONS][state] = {}
+    if len(p) == 5:
+        # simple
+        seq = p[3]
+    if len(p) == 6:
+        # simple equals
+        seq = p[4]
     elif len(p) == 8:
-        Statemachine['Transactions'][p[1]] = p[6]
-        Statemachine['Transactions'][p[1]]['Inherits'] = p[3]
+        # Inheritance
+        seq = p[6]
+        if 'Inherits' not in Statemachine[STATES][state]:
+            Statemachine[STATES][state]['Inherits'] = []
+        Statemachine[STATES][state]['Inherits'] += p[3]
+
+    for item in seq:
+        Statemachine[TRANSACTIONS][state][item[1]] = {
+            'actions': item[2],
+            'events': item[3],
+            'states': item[4]
+        }
 
 def p_state_code_list(p):
     '''
@@ -409,34 +440,40 @@ def p_state_code(p):
                | state_code_2
                | state_code_3
                | state_code_4
+               | state_code_5
     '''
     p[0] = p[1]
 
 def p_state_code_1(p): # Classifier
     '''
-    state_code_1 : event_type CLASSIFIER action_type TRANSITION event_list
-                 | event_type DISPATCH action_type CLASSIFIER event_list
+    state_code_1 : event_type DISPATCH action_list CLASSIFIER event_list
     '''
-    p[0] = [1, p[1], [p[3]], p[5]]
+    p[0] = [1, p[1], p[3], p[5], []]
 
 def p_state_code_2(p): # Action only
     '''
     state_code_2 : event_type DISPATCH action_list
     '''
-    p[0] = [2, p[1], p[3], []]
+    p[0] = [2, p[1], p[3], [], []]
 
 def p_state_code_3(p): # Transition only
     '''
     state_code_3 : event_type TRANSITION state_list
     '''
-    p[0] = [3, p[1], [], p[3]]
+    p[0] = [3, p[1], [], [], p[3]]
 
 def p_state_code_4(p): # Action and Transition
     '''
     state_code_4 : event_type DISPATCH action_list TRANSITION state_list
     '''
     ReportP(p, "state_code")
-    p[0] = [4, p[1], p[3], p[5]]
+    p[0] = [4, p[1], p[3], [], p[5]]
+
+def p_state_code_5(p): # Everything
+    '''
+    state_code_5 : event_type DISPATCH action_list CLASSIFIER event_list TRANSITION state_list
+    '''
+    p[0] = [5, p[1], p[3], p[5], p[7]]
 
 def p_id_list(p):
     '''
@@ -454,22 +491,21 @@ def p_test_list(p):
     test_list : id_list
     '''
     p[0] = ['Test', p[1]]
-    Statemachine['Tests'].append(p[1])
+    Statemachine[TESTS].append(p[1])
 
 #
 # The CODE block
 #
 def p_code(p):
     '''
-    code : code_type id_or_str LBRACE code_block RBRACE
-         | code_type id_or_str EQUALS LBRACE code_block RBRACE
+    code : code_type id_or_str equal LBRACE code_block RBRACE
     '''
     if len(p) > 6: # it has the EQUALS in there
-        Statemachine['Code'][p[2]] = {'name' : p[2], 'type' : p[1], 'text' : p[5]}
-        p[0] = {'Code' : {'name' : p[2], 'type' : p[1], 'text' : p[5]}}
+        Statemachine[CODE][p[2]] = {'name' : p[2], 'type' : p[1], 'text' : p[5]}
+        p[0] = {CODE : {'name' : p[2], 'type' : p[1], 'text' : p[5]}}
     else:
-        Statemachine['Code'][p[2]] = {'name' : p[2], 'type' : p[1], 'text' : p[4]}
-        p[0] = {'Code' : {'name' : p[2], 'type' : p[1], 'text' : p[4]}}
+        Statemachine[CODE][p[2]] = {'name' : p[2], 'type' : p[1], 'text' : p[4]}
+        p[0] = {CODE : {'name' : p[2], 'type' : p[1], 'text' : p[4]}}
 
 def p_code_type(p):
     '''
@@ -492,10 +528,10 @@ def p_code_block(p):
 
 def p_c_code_block(p):
     '''
-    c_code_block : AT_C code_list AT_END
+    c_code_block : AT_CODE code_list AT_END
     '''
-    ReportP(p, "tcl_code_block")
-    p[0] = ['C', p[2]]
+    ReportP(p, "c_code_block")
+    p[0] = [p[1], p[2]]
 
 def p_python_code_block(p):
     '''
@@ -543,6 +579,13 @@ def p_comma(p):
     '''
     pass
 
+def p_equal(p):
+    '''
+    equal : empty
+          | EQUALS
+    '''
+    pass
+
 def p_empty(p):
     '''
     empty :
@@ -568,57 +611,167 @@ def load_file(source_file):
 def process_source(source_file):
     global Statemachine
     Statemachine = {}
-    Statemachine['Filename'] = source_file
-    Statemachine['Outputs'] = []
-    Statemachine['States'] = {}
-    Statemachine['Events'] = {}
-    Statemachine['Actions'] = {}
-    Statemachine['Transactions'] = {}
-    Statemachine['Tests'] = []
-    Statemachine['Code'] = {}
+    Statemachine[FILENAME] = source_file
+    Statemachine[OUTPUTS] = []
+    Statemachine[STATES] = {}
+    Statemachine[EVENTS] = {}
+    Statemachine[ACTIONS] = {}
+    Statemachine[TRANSACTIONS] = {}
+    Statemachine[TESTS] = []
+    Statemachine[CODE] = {}
     SourceData = load_file(source_file)
     if args.yaccdebug:
         yaccer.parse('\n'.join(SourceData), debug=True)
     else:
         yaccer.parse('\n'.join(SourceData))
     if True:
+        #print(Statemachine)
         print("Statemachine:")
         for key in sorted(Statemachine):
-            if key in ['Actions', 'Code', 'Events', 'States', 'Transactions']:
+            if key in [ACTIONS, EVENTS, STATES]:
+                print("  %s:" % key)
                 for item in sorted(Statemachine[key]):
-                    print("  %s: %s: %s" % (key, item, Statemachine[key][item]))
+                    print("    %s: %s" % (item, Statemachine[key][item]))
+            elif key in [CODE]:
+                #print(Statemachine[key])
+                for item in sorted(Statemachine[key]):
+                    print("    %s.%s:" % (key, item))
+                    for iitem in sorted(Statemachine[key][item]):
+                        print("      %s" % (Statemachine[key][item][iitem]))
+            elif key in [TRANSACTIONS]:
+                #print(Statemachine[key])
+                print("  %s:" % key)
+                for state in sorted(Statemachine[key]):
+                    print("    State.%s:" % state)
+                    for event in Statemachine[key][state]:
+                        print("      Event:%s = %s" % (event, repr(Statemachine[key][state][event])))
             else:
                 print("  %s: %s"%(key, Statemachine[key]))
-    #generate_source(Statemachine, SourceData, source_file)
+    generate_source(Statemachine, SourceData, source_file)
 
 def generate_source(the_fsm, SourceData, source_file):
     import json
     import yaml
 
     dest_file = os.path.join(os.path.dirname(source_file),\
-                             the_fsm.name + ".fsm")
-    the_fsm.dest_file = dest_file
+                             the_fsm[NAME] + ".fsm")
+    the_fsm[DEST] = dest_file
     basename = os.path.basename(dest_file)
     print("Basename:%s" % basename)
+    print("Destname:%s" % dest_file)
+
+    #
+    # Generate the SQL
+    #
+
+    #
+    # Generate the Reformatted State Machine text
+    #
+    Load(the_fsm, 'FSM')
+
+    #
+    # Generate the UML
+    #
+    Load(the_fsm, 'UML')
 
     #
     # Generate the YML
     #
-    fsm_yml = StateMachine_YML(the_fsm)
-    the_dict = fsm_yml.Dictify()
+    print(yaml.dump(the_fsm))
     with open("%s.yml" % dest_file, "w") as fdo:
-        fdo.write(yaml.dump(the_dict, indent=4))
+        fdo.write(yaml.dump(the_fsm, indent=4))
     with open("%s.json" % dest_file, "w") as fdo:
-        fdo.write(json.dumps(the_dict, indent=4))
-    fsm_yml.Load('UML')
-    fsm_yml.Load('FSM')
-    fsm_yml.Load('PYTHON')
-    if 'GCC' in the_fsm.outputs:
-        fsm_yml.Load('GCC')
-    if 'TCL' in the_fsm.outputs:
-        fsm_yml.Load('TCL')
+        fdo.write(json.dumps(the_fsm, indent=4))
     #os.system(uml_cmd)
 
+    #
+    # Generate the Graphviz
+    #
+
+    #
+    # Generate the HTML
+    #
+#   Load(the_fsm, 'HTML')
+
+    #
+    # Generate the TCL
+    #
+    if 'TCL' in the_fsm[OUTPUTS]:
+        Load(the_fsm, 'TCL')
+
+    #
+    # Generate the PYTHON
+    #
+    if 'GCC' in the_fsm[OUTPUTS]:
+        Load(the_fsm, 'PYTHON')
+
+    #
+    # Generate GCC3
+    #
+    if 'GCC' in the_fsm[OUTPUTS]:
+        Load(the_fsm, 'GCC')
+
+def Load(my_vars, template):
+    import sys
+    import jinja2
+    import yaml
+    template_base = os.path.realpath(
+        os.path.abspath(
+            os.path.dirname(sys.argv[0])
+        )
+    )
+    templateLoader = jinja2.FileSystemLoader(searchpath=template_base)
+    templateEnv = jinja2.Environment(loader=templateLoader)
+
+    template_name = "template_%s.yml" % template.lower()
+    template = templateEnv.get_template(template_name)
+
+    configText = template.render(my_vars)
+    config = yaml.load(configText)
+    print(config)
+    my_vars['config'] = config
+    #print(yaml.dump(my_vars, indent=4))
+    for file in config['template']['files']:
+        dest_file = file['output']
+        my_vars['code_blocks'] = {}
+        if 'preload' in file:
+            my_vars['code_blocks'] = Preload(file['preload'])
+            #print(yaml.dump(my_vars['code_blocks'], indent=4))
+        template = templateEnv.get_template(file['input'])
+        outputText = template.render(my_vars)
+        with open(dest_file, 'w') as fdo:
+            fdo.write(outputText)
+
+def Preload(filename):
+    '''
+    This method reads an existing skeleton file and loads code_blocks
+    with the code between custom code markers in the skeleton file.
+
+    This code can later be emitted in place of the boilerplate to preserve
+    custom code development if the state machine is later regenerated.
+    '''
+    target = None
+    code_blocks = {}
+    try:
+        with open(filename, "r") as fd:
+            lines = fd.read().splitlines()
+    except IOError:
+        lines = []
+    for line in lines:
+        if " BEGIN CUSTOM: " in line:
+            target = re.sub(r'.*BEGIN CUSTOM: ([ _a-zA-Z0-9]+) +[^ _a-zA-Z0-9].*', r'\1', line)
+            code_blocks[target] = []
+            continue
+        if " END CUSTOM: " in line:
+            if not code_blocks[target]:
+                del code_blocks[target]
+            target = None
+            continue
+        if target:
+            code_blocks[target].append(line)
+#   for target in code_blocks:
+#       print "Target:", target, len(code_blocks[target])
+    return code_blocks
 
 def main():
     global lexer, yaccer

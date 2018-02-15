@@ -53,26 +53,16 @@ STATEMACHINE {{statemachine|lower}} {
   State {{state}} {
     {%- for event in events|sort(case_sensitive=True) %}
       {%- if transactions[state][event] is defined %}
-        {%- if transactions[state][event]['type'] == 'classifier' %}
     {{ event }}
-          {%- if transactions[state][event]['actions'] is defined -%}
+        {%- if transactions[state][event]['actions']|count -%}
             {{NL}} -> {{ transactions[state][event]['actions']|join(', ') }}
-          {%- endif -%}
-          {{NL}} --> {{ transactions[state][event]['targets']|join(', ') }};
-        {%- endif %}
-      {%- endif %}
-    {%- endfor %}
-    {%- for event in events|sort(case_sensitive=True) %}
-      {%- if transactions[state][event] is defined %}
-        {%- if transactions[state][event]['type'] == 'transition' %}
-    {{ event }}
-          {%- if transactions[state][event]['actions'] is defined -%}
-            {{NL}} -> {{ transactions[state][event]['actions']|join(', ') }}
-          {%- endif -%}
-          {%- if transactions[state][event]['targets']|count > 0 -%}
-            {{NL}} => {{ transactions[state][event]['targets']|join(', ') }}
-          {%- endif %};
-        {%- endif %}
+        {%- endif -%}
+        {%- if transactions[state][event]['events']|count -%}
+          {{NL}} --> {{ transactions[state][event]['events']|join(', ') }};
+        {%- endif -%}
+        {%- if transactions[state][event]['states']|count > 0 -%}
+          {{NL}} => {{ transactions[state][event]['states']|join(', ') }}
+        {%- endif %};
       {%- endif %}
     {%- endfor %}
   }

@@ -2,17 +2,17 @@
 {%- set sm = statemachine|lower -%}
 @startuml
 title {{SM}}
-{% for state in states|sort %}
+{%- for state in states|sort %}
 state {{state}} : {{states[state]['comment']|join('\\n')}}
 {%- if states[state]['flags'] is defined and 'INITIAL' in states[state]['flags'] %}
 [*] -> {{state}}
 {%- endif %}
 {%- endfor %}
-{% for state in states|sort %}
-{%- for event in events|sort if transactions[state][event] is defined and transactions[state][event]['type'] == 'transition' %}
-{%- if transactions[state][event]['targets'] is defined %}
-{{state}} --> {{transactions[state][event]['targets']|first}} : {{event}}
-{%- if transactions[state][event]['actions'] is defined -%}
+{% for state in states|sort  if transactions[state] is defined %}
+{%- for event in events|sort if transactions[state][event] is defined %}
+{%- if transactions[state][event]['states']|count > 0 %}
+{{state}} --> {{transactions[state][event]['states']|first}} : {{event}}
+{%- if transactions[state][event]['actions']|count > 0 -%}
 \n({{transactions[state][event]['actions']|join(',\\n')}})
 {%- endif %}
 {%- endif %}

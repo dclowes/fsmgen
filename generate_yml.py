@@ -117,20 +117,20 @@ class StateMachine_YML(StateMachine_Text):
             for event in sorted(the_events):
                 for block in [b for b in self.classifiers
                               if b.source == state and b.event == event]:
-                    this_one = {'type': 'classifier'}
+                    this_one = {'actions': [], 'events': [], 'states': []}
                     if block.actions:
                         this_one['actions'] = block.actions
                     if block.targets:
-                        this_one['targets'] = block.targets
+                        this_one['events'] = block.targets
                     this_state[event] = this_one
             for event in sorted(the_events):
                 for block in [b for b in self.transitions
                               if b.source == state and b.event == event]:
-                    this_one = {'type': 'transition'}
+                    this_one = {'actions': [], 'events': [], 'states': []}
                     if block.actions:
                         this_one['actions'] = block.actions
                     if block.targets:
-                        this_one['targets'] = block.targets
+                        this_one['states'] = block.targets
                     this_state[event] = this_one
             transactions[state] = this_state
         result['transactions'] = transactions

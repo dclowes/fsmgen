@@ -79,8 +79,8 @@ const static fsmTransTab {{SM}}_TRANS_{{state}}_{{event}} = {
     .inEvent=e{{SM}}_EVENT_{{event}},
 {%- if transactions[state][event].type == "transition"%}
     .ac_type=fsmActionTrans,
-{%- if transactions[state][event].targets|count > 0 %}
-    .ac_code=e{{SM}}_STATE_{{transactions[state][event].targets|first}},
+{%- if transactions[state][event].states|count > 0 %}
+    .ac_code=e{{SM}}_STATE_{{transactions[state][event].states|first}},
 {%- else %}
     .ac_code=0,
 {%- endif %}
@@ -97,7 +97,7 @@ const static fsmTransTab {{SM}}_TRANS_{{state}}_{{event}} = {
     .ac_code=0,
 {%- endif %}
     .ac_list= {
-      {%- for target in transactions[state][event].targets %}
+      {%- for target in transactions[state][event].events %}
         e{{SM}}_EVENT_{{ target }},
       {%- endfor %}
         0}

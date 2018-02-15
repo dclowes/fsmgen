@@ -28,7 +28,7 @@ Verbose = None
 args = None
 
 states = (
-    ('tcl', 'exclusive'),
+    ('code', 'exclusive'),
     )
 
 def FormatEvent(event):
@@ -162,7 +162,7 @@ tokens = [
     'TEXT_STRING2',
     'EQUALS',
     'ID',
-    'AT_C',
+    'AT_CODE',
     'AT_PYTHON',
     'AT_TCL',
     'AT_END',
@@ -191,45 +191,21 @@ def t_AT_CODE(t):
     else:
         lang = t.value[1:].upper()
     if lang in ['GCC', 'C']:
-        t.type = 'AT_C'
-        t.value = '@C'
+        t.type = 'AT_CODE'
+        t.value = lang
     elif lang in ['PYTHON']:
         t.type = 'AT_PYTHON'
-        t.value = '@PYTHON'
+        t.value = 'PYTHON'
     elif lang in ['TCL']:
         t.type = 'AT_TCL'
-        t.value = '@TCL'
+        t.value = 'TCL'
     else:
-        message = "Illegal code language '%s'" % t.value
-        PrintParseError(message)
-    t.lexer.begin('tcl')
+        t.type = 'AT_CODE'
+        t.value = lang
+    t.lexer.begin('code')
     return t
 
-#def t_AT_C(t):
-#    r'@(GC)?C'
-#    if Verbose:
-#        print 'AT_C'
-#    t.lexer.begin('tcl')
-#    t.value = "@C"
-#    return t
-#
-#def t_AT_PYTHON(t):
-#    r'@PYTHON'
-#    if Verbose:
-#        print 'AT_PYTHON'
-#    t.lexer.begin('tcl')
-#    t.value = "@PYTHON"
-#    return t
-#
-#def t_AT_TCL(t):
-#    r'@TCL'
-#    if Verbose:
-#        print 'AT_TCL'
-#    t.lexer.begin('tcl')
-#    t.value = "@TCL"
-#    return t
-
-def t_tcl_AT_END(t):
+def t_code_AT_END(t):
     r'[ \t]*@END'
     if Verbose:
         print 'AT_END'
@@ -238,22 +214,22 @@ def t_tcl_AT_END(t):
     return t
 
 
-t_tcl_ignore = ""
+t_code_ignore = ""
 
-def t_tcl_CODE_STRING(t):
+def t_code_CODE_STRING(t):
     r'.+'
     if t.value[0] == '@':
         t.value = t.value[1:]
     if Verbose:
-        print 'TCL:', t.value
+        print 'CODE:', t.value
     return t
 
-def t_tcl_newline(t):
+def t_code_newline(t):
     r'\n+'
     t.lexer.lineno += t.value.count("\n")
 
-def t_tcl_error(t):
-    message = "Illegal tcl character '%s'" % t.value[0]
+def t_code_error(t):
+    message = "Illegal code character '%s'" % t.value[0]
     PrintParseError(message)
     t.lexer.skip(1)
 
@@ -477,15 +453,20 @@ def p_action_list(p):
 def p_action_type(p):
     '''
     action_type : id_or_str
+                | id_or_str LPAREN event_list RPAREN
                 | action_type text_string
     '''
     p[0] = p[1]
     if p[0] not in Statemachine['Actions']:
         Statemachine['Actions'].append(p[0])
     if len(p) == 3:
+        # with comment
         if p[0] not in Statemachine['Action_Comments']:
             Statemachine['Action_Comments'][p[0]] = []
         Statemachine['Action_Comments'][p[0]].append(p[2])
+    if len(p) == 5:
+        # with events
+        pass
 
 def p_state_block(p):
     '''
@@ -603,10 +584,10 @@ def p_code_block(p):
 
 def p_c_code_block(p):
     '''
-    c_code_block : AT_C code_list AT_END
+    c_code_block : AT_CODE code_list AT_END
     '''
-    ReportP(p, "tcl_code_block")
-    p[0] = ['C', p[2]]
+    ReportP(p, "c_code_block")
+    p[0] = [p[1], p[2]]
 
 def p_python_code_block(p):
     '''
