@@ -71,51 +71,36 @@ enum {
 {%- endfor %}
 };
 
-/* Transition Table Structures */
-typedef enum {
-    fsmActionClass = 1, /* Classifier Action Entry */
-    fsmActionTrans = 2  /* Transition Action Entry */
-} fsmActionType;
-
+/* Transaction Table Structures */
 typedef struct fsmTransTab_t {
-    int inState;  /* Input State */
-    int inEvent;  /* Input Event */
-    fsmActionType ac_type; /* Classifier or Transition */
-    int ac_code;  /* Classifier Func or Output State */
-    int ac_list[];    /* Output Events or Action Funcs */
+    int inState;        /* Input State */
+    int inEvent;        /* Input Event */
+    int outState;       /* Output State */
+    int actList[];      /* Action Funcs */
+    int outEvents[];    /* Output Events */
 } fsmTransTab;
 
-/* Transition Table Entries */
+/* Transaction Table Entries */
 {%- for state in transactions|sort(case_sensitive=True) %}
 {%- for event in transactions[state]|sort(case_sensitive=True) %}
 const static fsmTransTab {{SM}}_TRANS_{{state}}_{{event}} = {
     .inState=e{{SM}}_STATE_{{state}},
     .inEvent=e{{SM}}_EVENT_{{event}},
-{%- if transactions[state][event].type == "transition"%}
-    .ac_type=fsmActionTrans,
 {%- if transactions[state][event].states|count > 0 %}
-    .ac_code=e{{SM}}_STATE_{{transactions[state][event].states|first}},
+    .outState=e{{SM}}_STATE_{{transactions[state][event].states|first}},
 {%- else %}
-    .ac_code=0,
+    .outState=0,
 {%- endif %}
-    .ac_list= {
+    .actList= {
 {%- for action in transactions[state][event].actions %}
         e{{SM}}_ACTION_{{ action }},
 {%- endfor %}
         0}
-{%- else %}
-    .ac_type=fsmActionClass,
-{%- if transactions[state][event].actions|count > 0 %}
-    .ac_code=e{{SM}}_ACTION_{{transactions[state][event].actions|first}},
-{%- else %}
-    .ac_code=0,
-{%- endif %}
-    .ac_list= {
-      {%- for target in transactions[state][event].events %}
+    .outEvents= {
+{%- for target in transactions[state][event].events %}
         e{{SM}}_EVENT_{{ target }},
-      {%- endfor %}
+{%- endfor %}
         0}
-{%- endif %}
 };
 {%- endfor %}
 {%- endfor %}
@@ -126,12 +111,12 @@ struct {{SM}}_STATE_t {
     const char *name;
     const fsmTransTab *transTab[];
 };
-{%- for state in states|sort(case_sensitive=True) %}
+{% for state in states|sort(case_sensitive=True) %}
 static struct {{SM}}_STATE_t const s{{SM}}_STATE_{{state}} = {
     .index=e{{SM}}_STATE_{{state}},
     .name="{{state}}",
     .transTab={
-                   NULL,
+        NULL,
 {%- for event in events|sort(case_sensitive=True) %}
 {%- if transactions[state][event] is defined %}
         &{{SM}}_TRANS_{{state}}_{{event}},
@@ -240,80 +225,82 @@ void {{SM}}_InstanceKill({{SM}} smi)
     free(smi);
 }
 
-/* Run one Event for this Instance of this Statemachine */
+/**
+ * Run one Event for this Instance of this Statemachine
+ *
+ * @param   smi        the statemachine instance
+ * @param   ev         the event to process
+ * @param   pContext   the event context data
+ * @return             the old/new state
+ */
 static {{SM}}_STATE {{SM}}_RunStateEvent(
     {{SM}} smi,
     {{SM}}_EVENT ev,
     void *pContext)
 {
-    int i, j, k;
-    int nTrans=0, nActns=0;
-    {{SM}}_EVENT next_event = NULL;
-    {{SM}}_STATE next_state = smi->currentState;
     const fsmStateMachine *fsm = smi->fsm;
-    const fsmTransTab *tab = NULL;
-    do {
-        next_event = NULL;
-        if (ev == NULL) {
-            return next_state;
-        }
-        tab = next_state->transTab[ev->index];
+    const {{SM}}_STATE state = smi->currentState;
+    const {{SM}}_EVENT event = ev;
+    const fsmTransTab *tab;
+    /* For this and each generated event */
+    while (event) {
+        tab = state->transTab[ev->index];
         if (tab) {
-            fsmActionType actionType = tab->ac_type;
-            {{SM}}_Action fn;
-            ++nTrans;
-            switch (actionType) {
-                case fsmActionClass:
-                    k = tab->ac_code;
-                    fn = fsm->actionTab[k];
-                    if (smi->actionTab && smi->actionTab[k])
-                        fn = smi->actionTab[k];
-                    if (smi->reportFunc)
-                        (*smi->reportFunc)(smi,
-                            "%s(%s) -> %s",
-                            smi->currentState->name,
-                            ev->name,
-                            fsm->actionTable[k]->name);
-                    next_event = (*fn)(smi, smi->currentState, ev, pContext, smi->pPrivate);
-                    ev = next_event;
-                    break;
-                case fsmActionTrans:
-                    if (tab->ac_code)
-                        next_state = fsm->stateTable[tab->ac_code];
-                    nActns = 0;
-                    for (j = 0; tab->ac_list[j]; ++ j) {
-                        ++nActns;
-                        k = tab->ac_list[j];
-                        fn = fsm->actionTab[k];
-                        if (smi->actionTab && smi->actionTab[k])
-                            fn = smi->actionTab[k];
-                        if (smi->reportFunc)
-                            (*smi->reportFunc)(smi,
-                                "%s(%s) [%s]",
-                                smi->currentState->name,
-                                ev->name,
-                                fsm->actionTable[k]->name);
-                        (void) (*fn)(smi, smi->currentState, ev, pContext, smi->pPrivate);
-                    }
-                    if (nActns == 0) /* no actions reported */
-                        if (smi->reportFunc)
-                            (*smi->reportFunc)(smi,
-                                "%s(%s) [<no actions>]",
-                                smi->currentState->name,
-                                ev->name);
-                    break;
+            int i;
+            if (tab->actList[0] == 0) {
+                /* No Actions */
+                if (smi->reportFunc) {
+                    (*smi->reportFunc)(smi, "%s(%s) [<no actions>]",
+                        state->name, event->name);
+                }
+                if (tab->outState) {
+                    return fsm->stateTable[tab->outState];
+                }
+                break;
             }
-        }
-        if (nTrans == 0) /* event not handled */
+            for (i = 0; tab->actList[i]; ++i) {
+                {{SM}}_Action fn;
+                int k;
+                k = tab->actList[i];
+                fn = fsm->actionTab[k];
+                if (smi->actionTab && smi->actionTab[k])
+                    fn = smi->actionTab[k];
+                /* Report the action */
+                if (smi->reportFunc)
+                    (*smi->reportFunc)(smi, "%s(%s) -> %s",
+                        state->name, event->name, fsm->actionTable[k]->name);
+                /* Invoke the action */
+                event = (*fn)(smi, state, event, pContext, smi->pPrivate);
+                if (event) {
+                    /* TODO: check this event is allowed */
+                    break;
+                }
+            }
+            if (event) {
+                /* This is a new (classifier or exception) event */
+                continue;
+            }
+            if (tab->outState) {
+                return fsm->stateTable[tab->outState];
+            }
+        } else {
+            /* TODO: Default */
             if (smi->reportFunc)
-                (*smi->reportFunc)(smi,
-                    "%s(%s) [<unhandled>]",
-                    smi->currentState->name,
-                    ev->name);
-    } while (next_event);
-    return next_state;
+                (*smi->reportFunc)(smi, "%s(%s) [<unhandled>]",
+                    state->name, ev->name);
+        }
+    }
+    return state;
 }
 
+/**
+ * Run an event through the statemachine instance
+ *
+ * @param smi       the statemachine instance
+ * @param ev        the event to process
+ * @param pContext  private event context
+ * @return          Nothing
+ */
 void {{SM}}_InstanceRun({{SM}} smi, {{SM}}_EVENT ev, void *pContext)
 {
     pQueueEntry event;
