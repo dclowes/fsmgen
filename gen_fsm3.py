@@ -625,7 +625,7 @@ def process_source(source_file):
     else:
         yaccer.parse('\n'.join(SourceData))
     if True:
-        #print(Statemachine)
+        print(Statemachine)
         print("Statemachine:")
         for key in sorted(Statemachine):
             if key in [ACTIONS, EVENTS, STATES]:
@@ -741,6 +741,12 @@ def Load(my_vars, template):
         outputText = template.render(my_vars)
         with open(dest_file, 'w') as fdo:
             fdo.write(outputText)
+        if 'post' in file:
+            for item in file['post']:
+                print(item)
+                os.system(item)
+
+
 
 def Preload(filename):
     '''

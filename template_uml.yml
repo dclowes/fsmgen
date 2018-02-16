@@ -4,4 +4,6 @@ template:
     - file: "PlantUML fsm script"
       input: template_uml.j2
       output: "{{dest_file}}2.uml"
+      post:
+        - "plantuml {{dest_file}}2.uml"
 

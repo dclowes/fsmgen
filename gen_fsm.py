@@ -15,13 +15,24 @@
 # pylint: disable=unused-argument
 #
 import os
-#import re
+import re
 import ply.lex as lex
 import ply.yacc as yacc
-import statemachine
+
+ACTIONS = 'actions'
+CODE = 'Code'
+DEST = 'dest_file'
+COMMENTS = 'comment'
+EVENTS = 'events'
+FLAGS = 'flags'
+FILENAME = 'filename'
+NAME = 'statemachine'
+OUTPUTS = 'outputs'
+STATES = 'states'
+TESTS = 'tests'
+TRANSACTIONS = 'transactions'
 
 Statemachine = None
-Statemachines = []
 lexer = None
 yaccer = None
 Verbose = None
@@ -31,6 +42,7 @@ states = (
     ('code', 'exclusive'),
     )
 
+import statemachine
 def FormatEvent(event):
     if len(event) > 1 and len(event[1]) > 0:
         txt = "%s(%s)" % (event[0], ", ".join(event[1]))
@@ -331,8 +343,6 @@ def p_fsm(p):
     if Verbose:
         print "Statemachine:", p[0]
     Statemachine['Name'] = p[2]
-    new_sm = Build_StateMachine(Statemachine)
-    Statemachines.append(new_sm)
 
 def p_fsm_block(p):
     '''
@@ -678,13 +688,32 @@ def process_source(source_file):
         yaccer.parse('\n'.join(SourceData), debug=True)
     else:
         yaccer.parse('\n'.join(SourceData))
-    if Verbose:
-        print "Statemachine:", Statemachine
-        for idx, sm in enumerate(Statemachines):
-            print "Statemachine[%d]:" % idx, sm
-    generate_source(Statemachines[0], SourceData, source_file)
+    if True:
+        print(Statemachine)
+        print("Statemachine:")
+        for key in sorted(Statemachine):
+            if key in [ACTIONS, EVENTS, STATES]:
+                print("  %s:" % key)
+                for item in sorted(Statemachine[key]):
+                    print("    %s: %s" % (item, Statemachine[key][item]))
+            elif key in [CODE]:
+                #print(Statemachine[key])
+                for item in sorted(Statemachine[key]):
+                    print("    %s.%s:" % (key, item))
+                    for iitem in sorted(Statemachine[key][item]):
+                        print("      %s" % (Statemachine[key][item][iitem]))
+            elif key in [TRANSACTIONS]:
+                #print(Statemachine[key])
+                print("  %s:" % key)
+                for state in sorted(Statemachine[key]):
+                    print("    State.%s:" % state)
+                    for event in Statemachine[key][state]:
+                        print("      Event:%s = %s" % (event, repr(Statemachine[key][state][event])))
+            else:
+                print("  %s: %s"%(key, Statemachine[key]))
+    generate_source(Statemachine, SourceData, source_file)
 
-def generate_source(the_fsm, SourceData, source_file):
+def generate_source(sm, SourceData, source_file):
     from generate_html import StateMachine_HTML
     from generate_sql import StateMachine_SQL
     from generate_uml import StateMachine_UML
@@ -692,6 +721,9 @@ def generate_source(the_fsm, SourceData, source_file):
     import json
     import yaml
 
+    the_fsm = Build_StateMachine(Statemachine)
+    print("Statemachine:")
+    print(repr(the_fsm))
     dest_file = os.path.join(os.path.dirname(source_file),\
                              the_fsm.name + ".fsm")
     the_fsm.dest_file = dest_file

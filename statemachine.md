@@ -50,6 +50,7 @@ This mechanism allows an action to "classify" an event, or to produce an excepti
 ````
 STATEMACHINE statemachine_name
 {
+  OUTPUT output_1[,...];
   STATES state_1["comment"][,...];
   EVENTS event_1["comment"][,...];
   ACTIONS action_1["comment"][,...];
@@ -63,7 +64,8 @@ STATEMACHINE statemachine_name
   {
     @[CODE=]C|TCL|GCC|PYTHON
     text
-    @END[...]
+    @END
+    [...]
   }
 }
 ````
