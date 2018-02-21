@@ -76,8 +76,8 @@ typedef struct fsmTransTab_t {
     int inState;        /* Input State */
     int inEvent;        /* Input Event */
     int outState;       /* Output State */
-    int actList[];      /* Action Funcs */
-    int outEvents[];    /* Output Events */
+    int actList[{{SM}}_NUM_ACTIONS+1];     /* Action Funcs */
+    int outEvents[{{SM}}_NUM_EVENTS+1];    /* Output Events */
 } fsmTransTab;
 
 /* Transaction Table Entries */
@@ -95,7 +95,7 @@ const static fsmTransTab {{SM}}_TRANS_{{state}}_{{event}} = {
 {%- for action in transactions[state][event].actions %}
         e{{SM}}_ACTION_{{ action }},
 {%- endfor %}
-        0}
+        0},
     .outEvents= {
 {%- for target in transactions[state][event].events %}
         e{{SM}}_EVENT_{{ target }},
@@ -239,8 +239,8 @@ static {{SM}}_STATE {{SM}}_RunStateEvent(
     void *pContext)
 {
     const fsmStateMachine *fsm = smi->fsm;
-    const {{SM}}_STATE state = smi->currentState;
-    const {{SM}}_EVENT event = ev;
+    {{SM}}_STATE state = smi->currentState;
+    {{SM}}_EVENT event = ev;
     const fsmTransTab *tab;
     /* For this and each generated event */
     while (event) {
@@ -424,6 +424,61 @@ const char *{{SM}}_GetName({{SM}} smi)
 }
 
 #ifdef UNIT_TEST
+{%- for action in actions|sort %}
+static {{SM}}_EVENT {{SM}}_ACTION_{{action}}_test(
+        {{SM}} smi,
+        {{SM}}_STATE state,
+        {{SM}}_EVENT event,
+        void *pContext,
+        void *pPrivate)
+{
+    printf("State: %-20s, Event: %-20s, ActionFunc: {{action}}\n", state->name, event->name);
+    return NULL;
+}
+
+{%- endfor %}
+
+static void register_{{sm}}_actions(void)
+{
+{%- for action in actions|sort %}
+    {{SM}}_ClassSetAction({{SM}}_ACTION_{{action}}, {{SM}}_ACTION_{{action}}_test);
+{%- endfor %}
+}
+
+static void test_{{sm}}_actions(void)
+{
+    {{SM}} smi;
+    int state;
+    int event;
+    int idx;
+    register_{{sm}}_actions();
+
+    smi = {{SM}}_InstanceMake("test", {{SM}}_STATE_ST_ConnectIdle);
+    for (state = 1; state <= {{SM}}_NUM_STATES; ++state) {
+        for (event = 1; event <= {{SM}}_NUM_EVENTS; ++event) {
+            const fsmTransTab *tab = {{SM}}_STATE_table[state]->transTab[event];
+            if (tab) {
+                smi->currentState = {{SM}}_STATE_table[state];
+                {{SM}}_InstanceRun(smi, {{SM}}_EVENT_table[event], NULL);
+                if (smi->currentState->index != state)
+                    printf("       %s ===> %s\n", {{SM}}_STATE_table[state]->name, smi->currentState->name);
+            }
+        }
+    }
+    {{SM}}_InstanceKill(smi);
+}
+
+static void fsmPrintStateMachine(void)
+{
+
+}
+
+int main(int argc, char *argv[])
+{
+    fsmPrintStateMachine();
+    test_{{sm}}_actions();
+}
+
 #endif /* UNIT_TEST */
 
 /*

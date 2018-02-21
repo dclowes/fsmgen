@@ -119,13 +119,10 @@ int main(int argc, char *argv[])
 
     {{SM}}_ClassInit();
     memset(&private_data, 0, sizeof(private_data));
-    smi = make(
-        "test", initialState,
-        &private_data, NULL);
-    {{SM}}_SetReportFunc(smi,
-        NULL);
+    smi = make("test", initialState, &private_data, NULL);
+    {{SM}}_SetReportFunc(smi, NULL);
 
-    /* test something */
+    /* Place main test code here */
     /* BEGIN CUSTOM: main code {{BEGIN_CODE}} */
 {%- if code_blocks['main code'] is defined %}
 {%- for line in code_blocks['main code'] %}
