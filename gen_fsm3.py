@@ -741,6 +741,9 @@ def Load(my_vars, template):
         outputText = template.render(my_vars)
         with open(dest_file, 'w') as fdo:
             fdo.write(outputText)
+        if 'echo' in file:
+            for item in file['echo']:
+                print(item)
         if 'post' in file:
             for item in file['post']:
                 print(item)
