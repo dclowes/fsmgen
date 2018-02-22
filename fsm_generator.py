@@ -1,8 +1,13 @@
-#!/usr/bin/env python
-# Author: Douglas Clowes (douglas.clowes@ansto.gov.au) Aug 2015
+#!/usr/bin/env python3
+"""
+This program compiles a domain-specific state machine
+language into a YAML structure. It then uses Jinja2
+templates to generate documentation and code.
+
+Author: Douglas Clowes (douglas.clowes@ansto.gov.au) Aug 2015
+"""
 # vim: ft=python ts=8 sts=4 sw=4 expandtab autoindent smartindent nocindent
 #
-
 # pylint: disable=invalid-name
 # pylint: disable=line-too-long
 # pylint: disable=too-many-lines
@@ -16,6 +21,11 @@
 #
 import os
 import re
+import sys
+import argparse
+import json
+import yaml
+import jinja2
 import ply.lex as lex
 import ply.yacc as yacc
 
@@ -650,8 +660,6 @@ def process_source(source_file):
     generate_source(Statemachine, SourceData, source_file)
 
 def generate_source(the_fsm, SourceData, source_file):
-    import json
-    import yaml
 
     dest_file = os.path.join(os.path.dirname(source_file),\
                              the_fsm[NAME] + ".fsm")
@@ -714,9 +722,6 @@ def generate_source(the_fsm, SourceData, source_file):
         Load(the_fsm, 'GCC')
 
 def Load(my_vars, template):
-    import sys
-    import jinja2
-    import yaml
     template_base = os.path.realpath(
         os.path.abspath(
             os.path.dirname(sys.argv[0])
@@ -789,7 +794,6 @@ def main():
     global lexer, yaccer
     global Verbose
     global args
-    import argparse
 
     graphviz = ['dot', 'circo', 'neato', 'fdp', 'sfdp', 'twopi', 'osage', 'patchwork']
     parser = argparse.ArgumentParser()
