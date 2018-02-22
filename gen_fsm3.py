@@ -725,7 +725,7 @@ def Load(my_vars, template):
     templateLoader = jinja2.FileSystemLoader(searchpath=template_base)
     templateEnv = jinja2.Environment(loader=templateLoader)
 
-    template_name = "template_%s.yml" % template.lower()
+    template_name = "config_%s.yml" % template.lower()
     template = templateEnv.get_template(template_name)
 
     configText = template.render(my_vars)
