@@ -624,7 +624,7 @@ def process_source(source_file):
         yaccer.parse('\n'.join(SourceData), debug=True)
     else:
         yaccer.parse('\n'.join(SourceData))
-    if True:
+    if Verbose:
         print(Statemachine)
         print("Statemachine:")
         for key in sorted(Statemachine):
@@ -657,8 +657,9 @@ def generate_source(the_fsm, SourceData, source_file):
                              the_fsm[NAME] + ".fsm")
     the_fsm[DEST] = dest_file
     basename = os.path.basename(dest_file)
-    print("Basename:%s" % basename)
-    print("Destname:%s" % dest_file)
+    if Verbose:
+        print("Basename:%s" % basename)
+        print("Destname:%s" % dest_file)
 
     #
     # Generate the SQL
@@ -677,7 +678,8 @@ def generate_source(the_fsm, SourceData, source_file):
     #
     # Generate the YML
     #
-    print(yaml.dump(the_fsm))
+    if Verbose:
+        print(yaml.dump(the_fsm))
     with open("%s.yml" % dest_file, "w") as fdo:
         fdo.write(yaml.dump(the_fsm, indent=4))
     with open("%s.json" % dest_file, "w") as fdo:
@@ -728,7 +730,8 @@ def Load(my_vars, template):
 
     configText = template.render(my_vars)
     config = yaml.load(configText)
-    print(config)
+    if Verbose:
+        print(config)
     my_vars['config'] = config
     #print(yaml.dump(my_vars, indent=4))
     for file in config['template']['files']:
