@@ -3,7 +3,7 @@ template:
   files:
     - file: "PlantUML fsm script"
       input: template_uml.j2
-      output: "{{dest_file}}2.uml"
+      output: "{{dest_file}}.uml"
       post:
-        - "plantuml {{dest_file}}2.uml"
+        - "plantuml {{dest_file}}.uml"
 

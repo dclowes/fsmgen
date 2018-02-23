@@ -3,15 +3,15 @@ template:
   files:
     - file: "Header file"
       input: template_gcc_h.j2
-      output: "{{dest_file}}3.h"
+      output: "{{dest_file}}.h"
     - file: "Code file"
       input: template_gcc_c.j2
-      output: "{{dest_file}}3.c"
+      output: "{{dest_file}}.c"
       echo:
-        - "gcc -c {{dest_file}}3.c -DUNIT_TEST"
+        - "gcc -c {{dest_file}}.c -DUNIT_TEST"
     - file: "Action file"
       input: template_gcc_a.j2
-      preload: "{{dest_file}}3.skel.c"
-      output: "{{dest_file}}3.skel.c"
+      preload: "{{dest_file}}.code.c"
+      output: "{{dest_file}}.code.c"
       echo:
-        - "gcc -c {{dest_file}}3.skel.c -DUNIT_TEST"
+        - "gcc -c {{dest_file}}.code.c -DUNIT_TEST"
