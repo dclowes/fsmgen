@@ -11,7 +11,7 @@ template:
         - "gcc -c {{dest_file}}3.c -DUNIT_TEST"
     - file: "Action file"
       input: template_gcc_a.j2
-      preload: "{{dest_file}}.skel.c"
+      preload: "{{dest_file}}3.skel.c"
       output: "{{dest_file}}3.skel.c"
       echo:
         - "gcc -c {{dest_file}}3.skel.c -DUNIT_TEST"
