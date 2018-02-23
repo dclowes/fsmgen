@@ -634,6 +634,15 @@ def process_source(source_file):
         yaccer.parse('\n'.join(SourceData), debug=True)
     else:
         yaccer.parse('\n'.join(SourceData))
+
+    #
+    if not "Default" in Statemachine[EVENTS]:
+        Statemachine[EVENTS]["Default"] = {"comment": ["State Default"]}
+    if not "Entry" in Statemachine[EVENTS]:
+        Statemachine[EVENTS]["Entry"] = {"comment": ["State Entry"]}
+    if not "Exit" in Statemachine[EVENTS]:
+        Statemachine[EVENTS]["Exit"] = {"comment": ["State Exit"]}
+
     if Verbose:
         print(Statemachine)
         print("Statemachine:")
