@@ -1,4 +1,8 @@
-STATEMACHINE {{statemachine|lower}} {
+STATEMACHINE {{statemachine|lower}}
+{%- for line in comment %}
+  "{{line}}"
+{%- endfor %}
+{
 {%- if outputs is defined %}
   OUTPUT {{ outputs|join(', ') }};
 {%- endif %}
@@ -10,7 +14,7 @@ STATEMACHINE {{statemachine|lower}} {
       {%- if states[state]['comment']|count == 1 %} "{{states[state]['comment']|first}}"
       {%- else %}
         {%- for comment in states[state]['comment'] %}
-          "{{comment}}"
+      "{{comment}}"
         {%- endfor %}
       {%- endif %}
     {%- else %} "No Comment"
@@ -21,6 +25,7 @@ STATEMACHINE {{statemachine|lower}} {
 {%- for event in events|sort(case_sensitive=True) %}
     {{event}}
   {%- if 'comment' in events[event] %}
+{%- if events[event]['comment']|count == 0 %} "No Comment"{% endif%}
     {%- if events[event]['comment']|count == 1 %} "{{events[event]['comment']|first}}"
     {%- else %}
       {%- for comment in events[event]['comment'] %}
@@ -58,7 +63,7 @@ STATEMACHINE {{statemachine|lower}} {
             {{NL}} -> {{ transactions[state][event]['actions']|join(', ') }}
         {%- endif -%}
         {%- if transactions[state][event]['events']|count -%}
-          {{NL}} --> {{ transactions[state][event]['events']|join(', ') }};
+          {{NL}} --> {{ transactions[state][event]['events']|join(', ') }}
         {%- endif -%}
         {%- if transactions[state][event]['states']|count > 0 -%}
           {{NL}} => {{ transactions[state][event]['states']|join(', ') }}
