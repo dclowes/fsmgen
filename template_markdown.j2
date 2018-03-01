@@ -1,0 +1,59 @@
+{%- set SM = statemachine|upper -%}
+{%- set sm = statemachine|lower -%}
+# State Machine {{SM}}
+{%- for line in comment %}
+{{ line }}<br>
+{%- endfor %}
+
+## States
+{%- for state in states|sort %}
+* {{state}}
+{%- for line in states[state]['comment'] %}
+    {{ line }}
+{%- endfor %}
+{%- endfor %}
+
+## Events
+{%- for event in events|sort %}
+* {{event}} - {{events[event]['comment']|join('\n ')}}
+{%- endfor %}
+
+## Actions
+{%- for action in actions|sort %}
+* {{action}} - {{actions[action]['comment']|join('\n ')}}
+{%- endfor %}
+
+# Transactions
+{%- for state in states|sort  if transactions[state] is defined %}
+
+## State {{state}}
+{%- for event in events|sort if transactions[state][event] is defined %}
+
+* {{event}}
+{%- if events[event]['comment']|count > 0 -%}
+: {{events[event]['comment']|first}}
+{%- endif %}
+
+{%- if transactions[state][event]['actions']|count > 0 %}
+  * Actions:
+{%- for item in transactions[state][event]['actions'] %}
+    * {{item}}
+{%- endfor %}
+{%- endif %}
+
+{%- if transactions[state][event]['events']|count > 0 %}
+  * Events Out:
+ {%- for item in transactions[state][event]['events'] %}
+    * {{item}}
+{%- endfor %}
+{%- endif %}
+
+{%- if transactions[state][event]['states']|count > 0 %}
+  * States Out:
+ {%- for item in transactions[state][event]['states'] %}
+    * {{item}}
+{%- endfor %}
+{%- endif %}
+
+{%- endfor %}
+{%- endfor %}

@@ -1,0 +1,6 @@
+---
+template:
+  files:
+    - file: "Markdown File"
+      input: template_markdown.j2
+      output: "{{dest_file}}.md"
