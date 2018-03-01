@@ -529,7 +529,7 @@ static void test_{{sm}}_actions(void)
     int idx;
     register_{{sm}}_actions();
 
-    smi = {{SM}}_InstanceMake("test", {{SM}}_STATE_ST_ConnectIdle);
+    smi = {{SM}}_InstanceMake("test", {{SM}}_STATE_{{initial|first}});
     /* For each state */
     for (state = 1; state <= {{SM}}_NUM_STATES; ++state) {
         printf("State: %s\n", {{SM}}_STATE_table[state]->name);
