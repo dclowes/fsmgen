@@ -36,6 +36,7 @@ COMMENTS = 'comment'
 EVENTS = 'events'
 FLAGS = 'flags'
 FILENAME = 'filename'
+INITIAL = 'initial'
 NAME = 'statemachine'
 OUTPUTS = 'outputs'
 STATES = 'states'
@@ -258,12 +259,21 @@ precedence = (
 #
 def p_fsm(p):
     '''
-    fsm : STATEMACHINE id_or_str fsm_block
+    fsm : STATEMACHINE fsm_head fsm_block
     '''
     p[0] = [{'Statemachine' : {p[2] : p[3]}}]
     if Verbose:
         print("Statemachine:"+ p[0])
     Statemachine[NAME] = p[2]
+
+def p_fsm_head(p):
+    '''
+    fsm_head : id_or_str
+             | fsm_head text_string
+    '''
+    p[0] = p[1]
+    if len(p) > 2:
+        Statemachine[COMMENTS].append(p[2])
 
 def p_fsm_block(p):
     '''
@@ -622,7 +632,9 @@ def process_source(source_file):
     global Statemachine
     Statemachine = {}
     Statemachine[FILENAME] = source_file
+    Statemachine[COMMENTS] = []
     Statemachine[OUTPUTS] = []
+    Statemachine[INITIAL] = []
     Statemachine[STATES] = {}
     Statemachine[EVENTS] = {}
     Statemachine[ACTIONS] = {}
@@ -642,6 +654,11 @@ def process_source(source_file):
         Statemachine[EVENTS]["Entry"] = {"comment": ["State Entry"]}
     if not "Exit" in Statemachine[EVENTS]:
         Statemachine[EVENTS]["Exit"] = {"comment": ["State Exit"]}
+    for state in sorted(Statemachine[STATES]):
+        if FLAGS in Statemachine[STATES][state]:
+            if "INITIAL" in Statemachine[STATES][state][FLAGS]:
+                if not state in Statemachine[INITIAL]:
+                    Statemachine[INITIAL].append(state)
 
     if Verbose:
         print(Statemachine)
@@ -669,7 +686,8 @@ def process_source(source_file):
     generate_source(Statemachine, SourceData, source_file)
 
 def generate_source(the_fsm, SourceData, source_file):
-
+    default_outputs = ['FSM', 'UML']
+    optional_outputs = ['GCC', 'PYTHON', 'TCL']
     dest_file = os.path.join(os.path.dirname(source_file),\
                              the_fsm[NAME] + ".fsm")
     the_fsm[DEST] = dest_file
@@ -677,6 +695,16 @@ def generate_source(the_fsm, SourceData, source_file):
     if Verbose:
         print("Basename:%s" % basename)
         print("Destname:%s" % dest_file)
+
+    #
+    # Generate the YML and JSON
+    #
+    if Verbose:
+        print(yaml.dump(the_fsm))
+    with open("%s.yml" % dest_file, "w") as fdo:
+        fdo.write(yaml.dump(the_fsm, indent=4))
+    with open("%s.json" % dest_file, "w") as fdo:
+        fdo.write(json.dumps(the_fsm, indent=4))
 
     #
     # Generate the SQL
@@ -691,17 +719,6 @@ def generate_source(the_fsm, SourceData, source_file):
     # Generate the UML
     #
     Load(the_fsm, 'UML')
-
-    #
-    # Generate the YML
-    #
-    if Verbose:
-        print(yaml.dump(the_fsm))
-    with open("%s.yml" % dest_file, "w") as fdo:
-        fdo.write(yaml.dump(the_fsm, indent=4))
-    with open("%s.json" % dest_file, "w") as fdo:
-        fdo.write(json.dumps(the_fsm, indent=4))
-    #os.system(uml_cmd)
 
     #
     # Generate the Graphviz
@@ -730,6 +747,16 @@ def generate_source(the_fsm, SourceData, source_file):
     if 'GCC' in the_fsm[OUTPUTS]:
         Load(the_fsm, 'GCC')
 
+    #
+    # Generate the requested outputs
+    #
+    for item in the_fsm[OUTPUTS]:
+        if item in default_outputs:
+            continue
+        if item in optional_outputs:
+            continue
+        Load(the_fsm, item)
+
 def Load(my_vars, template):
     template_base = os.path.realpath(
         os.path.abspath(
@@ -739,8 +766,12 @@ def Load(my_vars, template):
     templateLoader = jinja2.FileSystemLoader(searchpath=template_base)
     templateEnv = jinja2.Environment(loader=templateLoader)
 
-    template_name = "config_%s.yml" % template.lower()
-    template = templateEnv.get_template(template_name)
+    try:
+        template_name = "config_%s.yml" % template.lower()
+        template = templateEnv.get_template(template_name)
+    except jinja2.exceptions.TemplateNotFound:
+        print("Template %s not found" % template_name)
+        return
 
     configText = template.render(my_vars)
     config = yaml.load(configText)
