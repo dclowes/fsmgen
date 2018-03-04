@@ -1,59 +1,68 @@
 {%- set SM = statemachine|upper -%}
 {%- set sm = statemachine|lower -%}
-# State Machine {{SM}}
+# {{SM}}
 {%- for line in comment %}
 {{ line }}<br>
 {%- endfor %}
 
+![{{SM}} Diagram]({{dest_file}}.png)
 ## States
-{%- for state in states|sort %}
-* {{state}}
-{%- for line in states[state]['comment'] %}
-    {{ line }}
-{%- endfor %}
+
+These states are defined for the {{SM}} state machine.
+
+| State | Description |
+| ----- | ----------- |
+{%- for state in states|sort(case_sensitive=True) %}
+| {{state|replace('_', '\_')}} | {{ states[state]['comment']|join('<br> ') }} |
 {%- endfor %}
 
 ## Events
-{%- for event in events|sort %}
-* {{event}} - {{events[event]['comment']|join('\n ')}}
+
+These events are defined for the {{SM}} state machine.
+
+| Event | Description |
+| ----- | ----------- |
+{%- for event in events|sort(case_sensitive=True) %}
+| {{event|replace('_', '\_')}} | {{events[event]['comment']|join('<br> ') }} |
 {%- endfor %}
 
 ## Actions
-{%- for action in actions|sort %}
-* {{action}} - {{actions[action]['comment']|join('\n ')}}
+
+These actions are defined for the {{SM}} state machine.
+
+| Action | Description |
+| ----- | ----------- |
+{%- for action in actions|sort(case_sensitive=True) %}
+| {{action|replace('_', '\_')}} | {{actions[action]['comment']|join('<br> ')}} |
 {%- endfor %}
 
 # Transactions
-{%- for state in states|sort  if transactions[state] is defined %}
 
-## State {{state}}
-{%- for event in events|sort if transactions[state][event] is defined %}
+The following transactions are defined for the {{SM}} state machine.
+In the given state, for the given trigger event, the indicated actions are performed.
+If any output events are produced by an action then the transaction is diverted.
+Otherwise, if a Transfer state is shown then it becomes the new state.
+If a state change happens, an exit event is processed in the old state and
+an entry event is processed in the new state.
 
-* {{event}}
-{%- if events[event]['comment']|count > 0 -%}
-: {{events[event]['comment']|first}}
-{%- endif %}
+| State | Trigger Event | Actions | Event Out | Transfer State |
+| ---- | ---- | ---- | ---- | ---- |
+{%- for state in states|sort(case_sensitive=True)  if transactions[state] is defined %}
 
-{%- if transactions[state][event]['actions']|count > 0 %}
-  * Actions:
-{%- for item in transactions[state][event]['actions'] %}
-    * {{item}}
-{%- endfor %}
-{%- endif %}
+{%- for event in events|sort(case_sensitive=True) if transactions[state][event] is defined %}
+| {% if loop.index == 1 %}{{state|replace('_', '\_')}}{% endif %} | {{event|replace('_', '\_')}} |
 
-{%- if transactions[state][event]['events']|count > 0 %}
-  * Events Out:
- {%- for item in transactions[state][event]['events'] %}
-    * {{item}}
-{%- endfor %}
-{%- endif %}
+{%- if transactions[state][event]['actions']|count > 0 -%}
+{{ transactions[state][event]['actions']|join(',<br> ')|replace('_', '\_') }}
+{%- endif %} |
 
-{%- if transactions[state][event]['states']|count > 0 %}
-  * States Out:
- {%- for item in transactions[state][event]['states'] %}
-    * {{item}}
-{%- endfor %}
-{%- endif %}
+{%- if transactions[state][event]['events']|count > 0 -%}
+{{ transactions[state][event]['events']|join(',<br> ')|replace('_', '\_') }}
+{%- endif %} |
+
+{%- if transactions[state][event]['states']|count > 0 -%}
+{{ transactions[state][event]['states']|join(',<br> ')|replace('_', '\_') }}
+{%- endif %} |
 
 {%- endfor %}
 {%- endfor %}
