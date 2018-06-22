@@ -844,7 +844,7 @@ def main():
                         action="store_true")
     parser.add_argument("-v", "--verbose", help="verbose output",
                         action="store_true")
-    parser.add_argument("driver_source", help="driver source file", nargs="*")
+    parser.add_argument("driver_source", help="source file", nargs="*")
     args = parser.parse_args()
     if args.verbose:
         Verbose = True
