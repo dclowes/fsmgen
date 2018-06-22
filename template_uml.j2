@@ -4,9 +4,19 @@
 title {{SM}}
 {%- for state in states|sort %}
 state {{state}} : {{states[state]['comment']|join('\\n')}}
+{%- for event in transactions[state] if transactions[state][event]['states']|count == 0 -%}
+\n{{event}}:
+{%- if transactions[state][event]['actions']|count > 0 -%}
+\n  a: {{transactions[state][event]['actions']|join(',\\n\\t')}}
+{%- endif %}
+{%- if transactions[state][event]['events']|count > 0 -%}
+\n  e: {{transactions[state][event]['events']|join(',\\n\\t')}}
+{%- endif %}
+{%- endfor %}
 {%- if states[state]['flags'] is defined and 'INITIAL' in states[state]['flags'] %}
 [*] -> {{state}}
 {%- endif %}
+
 {%- endfor %}
 {% for state in states|sort  if transactions[state] is defined %}
 {%- for event in events|sort if transactions[state][event] is defined %}
