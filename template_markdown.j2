@@ -1,5 +1,5 @@
-{%- set SM = statemachine|upper -%}
-{%- set sm = statemachine|lower -%}
+{%- set SM = statemachine|replace('_', '\_')|upper -%}
+{%- set sm = statemachine|replace('_', '\_')|lower -%}
 # {{SM}}
 {%- for line in comment %}
 {{ line }}<br>
@@ -64,5 +64,22 @@ an entry event is processed in the new state.
 {{ transactions[state][event]['states']|join(',<br> ')|replace('_', '\_') }}
 {%- endif %} |
 
+{%- endfor %}
+{%- endfor %}
+
+# ComeFrom
+
+| State | Trigger Event | Actions | Source State |
+| ---- | ---- | ---- | ---- | ---- |
+{%- for item in states|sort(case_sensitive=True) %}
+{%- for state in transactions|sort(case_sensitive=True) %}
+{%- for event in transactions[state]|sort(case_sensitive=True) if item in transactions[state][event]['states'] %}
+| {{item|replace('_', '\_')}} | {{event|replace('_', '\_')}} |
+
+{%- if transactions[state][event]['actions']|count > 0 -%}
+{{ transactions[state][event]['actions']|join(',<br> ')|replace('_', '\_') }}
+{%- endif %} | {{state|replace('_', '\_')}} |
+
+{%- endfor %}
 {%- endfor %}
 {%- endfor %}
