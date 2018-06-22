@@ -17,6 +17,10 @@ state {{state}} : {{states[state]['comment']|join('\\n')}}
 [*] -> {{state}}
 {%- endif %}
 
+{%- if states[state]['flags'] is defined and 'FINAL' in states[state]['flags'] %}
+{{state}} -> [*]
+{%- endif %}
+
 {%- endfor %}
 {% for state in states|sort  if transactions[state] is defined %}
 {%- for event in events|sort if transactions[state][event] is defined %}
