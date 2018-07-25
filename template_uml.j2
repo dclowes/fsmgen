@@ -2,6 +2,8 @@
 {%- set sm = statemachine|lower -%}
 @startuml
 title {{SM}}
+
+' States
 {%- for state in states|sort %}
 state {{state}} : {{states[state]['comment']|join('\\n')}}
 {%- for event in transactions[state] if transactions[state][event]['states']|count == 0 -%}
@@ -13,16 +15,24 @@ state {{state}} : {{states[state]['comment']|join('\\n')}}
 \n  e: {{transactions[state][event]['events']|join(',\\n\\t')}}
 {%- endif %}
 {%- endfor %}
+{%- endfor %}
+
+' Entries
+{%- for state in states|sort %}
 {%- if states[state]['flags'] is defined and 'INITIAL' in states[state]['flags'] %}
 [*] -> {{state}}
 {%- endif %}
+{%- endfor %}
 
+' Exits
+{%- for state in states|sort %}
 {%- if states[state]['flags'] is defined and 'FINAL' in states[state]['flags'] %}
 {{state}} -> [*]
 {%- endif %}
-
 {%- endfor %}
-{% for state in states|sort  if transactions[state] is defined %}
+
+' Transitions
+{%- for state in states|sort  if transactions[state] is defined %}
 {%- for event in events|sort if transactions[state][event] is defined %}
 {%- if transactions[state][event]['states']|count > 0 %}
 {{state}} --> {{transactions[state][event]['states']|first}} : {{event}}
@@ -32,4 +42,6 @@ state {{state}} : {{states[state]['comment']|join('\\n')}}
 {%- endif %}
 {%- endfor %}
 {%- endfor %}
+
+right footer generated diagram
 @enduml

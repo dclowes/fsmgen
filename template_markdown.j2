@@ -1,6 +1,7 @@
 {%- set SM = statemachine|replace('_', '\_')|upper -%}
 {%- set sm = statemachine|replace('_', '\_')|lower -%}
-# {{SM}}
+<title> {{SM}} State Machine </title>
+# {{SM}} State Machine
 {%- for line in comment %}
 {{ line }}<br>
 {%- endfor %}
@@ -69,16 +70,23 @@ an entry event is processed in the new state.
 
 # ComeFrom
 
-| State | Trigger Event | Actions | Source State |
-| ---- | ---- | ---- | ---- | ---- |
-{%- for item in states|sort(case_sensitive=True) %}
-{%- for state in transactions|sort(case_sensitive=True) %}
-{%- for event in transactions[state]|sort(case_sensitive=True) if item in transactions[state][event]['states'] %}
-| {{item|replace('_', '\_')}} | {{event|replace('_', '\_')}} |
+The following table shows for each destination state,
+the state from which we could come,
+the event which would trigger that change,
+and the actions that may be performed.
 
-{%- if transactions[state][event]['actions']|count > 0 -%}
-{{ transactions[state][event]['actions']|join(',<br> ')|replace('_', '\_') }}
-{%- endif %} | {{state|replace('_', '\_')}} |
+| State | From State | Trigger Event | Actions |
+| ---- | ---- | ---- | ---- | ---- |
+{%- for new_state in states|sort(case_sensitive=True) %}{% set new_loop = loop -%}
+{%- for old_state in transactions|sort(case_sensitive=True) %}{% set old_loop = loop -%}
+{%- for event in transactions[old_state]|sort(case_sensitive=True) if new_state in transactions[old_state][event]['states'] %}
+| {% if new_loop.changed(new_state) %}{{new_state|replace('_', '\_')}}{% endif -%}
+| {% if old_loop.changed(old_state) %}{{old_state|replace('_', '\_')}}{% endif -%}
+| {{event|replace('_', '\_')}} |
+
+{%- if transactions[old_state][event]['actions']|count > 0 -%}
+{{ transactions[old_state][event]['actions']|join(',<br> ')|replace('_', '\_') }}
+{%- endif -%}
 
 {%- endfor %}
 {%- endfor %}
