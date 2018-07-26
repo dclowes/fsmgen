@@ -263,7 +263,7 @@ def p_fsm(p):
     '''
     p[0] = [{'Statemachine' : {p[2] : p[3]}}]
     if Verbose:
-        print("Statemachine:"+ p[0])
+        print("Statemachine:", p[0])
     Statemachine[NAME] = p[2]
 
 def p_fsm_head(p):
