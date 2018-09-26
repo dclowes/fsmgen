@@ -738,7 +738,7 @@ def generate_source(the_fsm, SourceData, source_file):
     #
     # Generate the PYTHON
     #
-    if 'GCC' in the_fsm[OUTPUTS]:
+    if 'PYTHON' in the_fsm[OUTPUTS]:
         Load(the_fsm, 'PYTHON')
 
     #
