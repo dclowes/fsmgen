@@ -1,11 +1,14 @@
 ---
 template:
+{%- if 'TCL' in outputs %}
+  files: []
+{%- else %}
   files:
-    - file: "TCL fsm script"
+    - file: "SCT fsm script"
       input: template_tcl.j2
       output: "{{dest_file}}2.tcl"
-    - file: "TCL action code"
+    - file: "SCT action code"
       input: template_tcl_code.j2
       preload: "{{dest_file}}.code.tcl"
-      output: "{{dest_file}}2.code.tcl"
-
+      output: "{{dest_file}}2.action.tcl"
+{% endif -%}
