@@ -47,8 +47,8 @@ The output is indented and sorted.
 
 ## Contributors
 
-* [Australian Centre for Neutron Scattering] (http://www.ansto.gov.au/ResearchHub/OurInfrastructure/ACNS)
+* [Australian Centre for Neutron Scattering](https://www.ansto.gov.au/research/facilities/australian-centre-for-neutron-scattering)
 
 ## Acknowledgements
 
-Sponsored by the [Australian Nuclear Science and Technology Organisation (ANSTO)] (http://www.ansto.gov.au).
+Sponsored by the [Australian Nuclear Science and Technology Organisation (ANSTO)](http://www.ansto.gov.au "ANSTO").
