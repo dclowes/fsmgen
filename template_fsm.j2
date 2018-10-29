@@ -75,12 +75,12 @@ STATEMACHINE {{statemachine|lower}}
 {%- endfor %}
 
 {%- for action in actions|sort %}
-  {%- if actions[action]['code_text'] is defined %}
+  {%- if action in Code %}
 
-  CODE {{action}} {
-  {%- for lang in actions[action]['code_text']|sort %}
-    @{{lang}}
-    {%- for line in actions[action]['code_text'][lang] %}
+  CODE {{Code[action].type}} {{action}} {
+  {%- for item in Code[action].text|sort %}
+    @{{item[0]}}
+    {%- for line in item[1] %}
 {{line}}
     {%- endfor %}
     @END

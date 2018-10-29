@@ -6,5 +6,6 @@ template:
       output: "{{dest_file}}2.py"
     - file: "Output other PYTHON"
       input: template_python3.j2
+      preload: "{{dest_file}}3.py"
       output: "{{dest_file}}3.py"
 

@@ -72,11 +72,11 @@ an entry event is processed in the new state.
 
 The following table shows for each destination state,
 the state from which we could come,
-the event which would trigger that change,
+the event which would trigger that transition,
 and the actions that may be performed.
 
 | State | From State | Trigger Event | Actions |
-| ---- | ---- | ---- | ---- | ---- |
+| ----- | ---------- | ------------- | ------- |
 {%- for new_state in states|sort(case_sensitive=True) %}{% set new_loop = loop -%}
 {%- for old_state in transactions|sort(case_sensitive=True) %}{% set old_loop = loop -%}
 {%- for event in transactions[old_state]|sort(case_sensitive=True) if new_state in transactions[old_state][event]['states'] %}
